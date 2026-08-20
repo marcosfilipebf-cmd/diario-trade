@@ -4,55 +4,71 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Diário Zella</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.8.0/Recharts.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#060d1f;color:#f1f5f9;font-family:system-ui,-apple-system,sans-serif}
+body{background:#060d1f;color:#f1f5f9;font-family:system-ui,-apple-system,sans-serif;padding:20px}
+@keyframes spin{to{transform:rotate(360deg)}}
 ::-webkit-scrollbar{width:4px}
-::-webkit-scrollbar-track{background:#0d1526}
 ::-webkit-scrollbar-thumb{background:#1e3a5f;border-radius:4px}
 input::placeholder,textarea::placeholder{color:#334155}
-@keyframes spin{to{transform:rotate(360deg)}}
-select option{background:#0d1526;color:#f1f5f9}
+.spinner{display:inline-block;width:13px;height:13px;border:2px solid #334155;border-top:2px solid #6366f1;border-radius:50%;animation:spin 0.8s linear infinite}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.card{background:#0d1526;border-radius:12px;border:1px solid #1e3a5f;padding:16px;margin-bottom:12px}
+.btn-primary{background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;border-radius:8px;color:#fff;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+.btn-primary:disabled{background:#1e3a5f;cursor:not-allowed;opacity:0.5}
+.btn-ghost{background:none;border:1px solid #1e3a5f;border-radius:8px;color:#64748b;padding:8px 14px;cursor:pointer;font-size:12px}
+.tab{background:none;border:none;border-bottom:2px solid transparent;color:#475569;padding:11px 18px;cursor:pointer;font-weight:600;font-size:13px;white-space:nowrap}
+.tab.active{border-bottom-color:#6366f1;color:#6366f1}
+select,input,textarea{background:#060d1f;border:1px solid #1e3a5f;border-radius:8px;color:#f1f5f9;font-size:13px;padding:8px 10px;outline:none;width:100%;font-family:inherit}
+select option{background:#0d1526}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px}
+.label{color:#64748b;font-size:11px;display:block;margin-bottom:4px}
+.section-label{color:#6366f1;font-size:10px;font-weight:700;letter-spacing:0.8px;margin-bottom:10px}
+.trade-card{background:#0b1220;border-radius:12px;margin-bottom:8px;overflow:hidden;cursor:pointer}
+.trade-row{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;flex-wrap:wrap;gap:8px}
+.trade-detail{padding:12px 16px;border-top:1px solid #1e3a5f;display:grid;gap:10px}
+.toggle-wrap{display:flex;align-items:center;gap:8px;cursor:pointer}
+.toggle-track{width:36px;height:20px;border-radius:10px;position:relative;transition:background 0.2s;flex-shrink:0;cursor:pointer}
+.toggle-thumb{width:14px;height:14px;border-radius:50%;background:#fff;position:absolute;top:3px;transition:left 0.2s}
+.alert{background:#2d0606;border:1px solid #ef4444;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.stats-bar{background:#08111f;border-bottom:1px solid #1e3a5f;padding:10px 20px;display:flex;gap:24px;overflow-x:auto}
+.metric{background:#0d1526;border-radius:10px;padding:12px 14px;border:1px solid #1e3a5f}
+.chat-msg{max-width:85%;border-radius:12px;padding:10px 14px;font-size:13px;line-height:1.7;white-space:pre-wrap;margin-bottom:8px}
 </style>
 </head>
 <body>
-<div id="root"></div>
-<script type="text/babel">
-const {useState,useEffect,useRef}=React;
-const {LineChart,Line,BarChart,Bar,XAxis,YAxis,Tooltip,ResponsiveContainer,Cell}=Recharts;
-
-// ── CONSTANTS ──────────────────────────────────────────────────────
-const CAPITAL=200,MAX_DAILY_LOSS=6,MAX_CONSEC=3;
+<div id="app"></div>
+<script>
+const CAPITAL=200,MAX_LOSS=6,MAX_CONSEC=3;
 const ALL_PAIRS=['US30','EURUSD','GBPUSD','BTC','US500','USOIL','XAGUSD','GBPJPY','NASDAQ','XAUUSD','AUDUSD'];
 const PAUSED=['AUDUSD','XAUUSD'];
 const SETUPS=['Pivot','Fibo'];
-const FIBO_LEVELS=['50','61.8','73.6'];
-const TIMEFRAMES=['M2','M5'];
-const SESSIONS=['Manhã','Tarde','Noite','Madrugada'];
-const EMOTIONS=['Neutro','Confiante','Ansioso','Com medo','Empolgado','Frustrado','Impaciente','Calmo'];
+const FIBO_LVL=['50','61.8','73.6'];
+const TFS=['M2','M5'];
+const SESS=['Manhã','Tarde','Noite','Madrugada'];
+const EMOTS=['Neutro','Confiante','Ansioso','Com medo','Empolgado','Frustrado','Impaciente','Calmo'];
 const RESULTS=['Win','Loss','BE'];
 const FIBO_CONF=['MM20','MM50','LT','PB LT','CHoCH'];
-const RETEST_TYPES=['Acima do nível','Tocou','Quebrou e voltou','Invalidou'];
-const LT_STRENGTH=['Forte','Fraco'];
-const CONTEXTS=['Tendência','Lateral','Pós-notícia'];
-const TARGETS=['0.382','0 (alvo)','Rompeu','Saiu antes'];
+const RETEST=['Acima do nível','Tocou','Quebrou e voltou','Invalidou'];
+const LT_STR=['Forte','Fraco'];
+const CTXS=['Tendência','Lateral','Pós-notícia'];
+const TGTS=['0.382','0 (alvo)','Rompeu','Saiu antes'];
 const RC={Win:'#22c55e',Loss:'#ef4444',BE:'#f59e0b'};
 const EC={Neutro:'#64748b',Confiante:'#22c55e',Ansioso:'#f59e0b','Com medo':'#ef4444',Empolgado:'#6366f1',Frustrado:'#ef4444',Impaciente:'#f59e0b',Calmo:'#22c55e'};
 
-const PARSE_PROMPT=`Você é especialista em trades de Forex/Futuros/Cripto. Setups: Pivot (RR 1:1) e Fibo (RR mín 3.5). Capital $200, risco $1/trade, perda máx diária $6. Corretora Exness Zero Spread, plataforma TradingView, TFs M2/M5.
-Extraia o trade descrito e retorne SOMENTE JSON válido sem markdown:
-{"par":"EURUSD","setup":"Pivot ou Fibo","direcao":"Compra ou Venda","resultado":"Win/Loss/BE","pnl":number,"rr_realizado":number,"fibo_nivel":"50/61.8/73.6 ou null","timeframe":"M2/M5","sessao":"Manhã/Tarde/Noite/Madrugada","emocao":"Neutro/Confiante/Ansioso/Com medo/Empolgado/Frustrado/Impaciente/Calmo","seguiu_regras":true,"moveu_be_cedo":false,"tinha_confluencia":true,"lt_rompimento_forte":true,"erros":"string ou null","acertos":"string ou null","data":"DD/MM/YYYY","notas":"string ou null","resumo_ia":"2-3 frases analisando com dica de melhoria","score":8}`;
+const PARSE_PROMPT=`Você é especialista em trades Forex/Futuros/Cripto. Setups: Pivot (RR 1:1) e Fibo (RR mín 3.5). Capital $200, risco $1/trade, perda máx $6/dia. Exness Zero Spread, TradingView, M2/M5.
+Extraia o trade e retorne SOMENTE JSON sem markdown:
+{"par":"EURUSD","setup":"Pivot","direcao":"Compra","resultado":"Win","pnl":1,"rr_realizado":1,"fibo_nivel":null,"timeframe":"M5","sessao":"Manhã","emocao":"Neutro","seguiu_regras":true,"moveu_be_cedo":false,"tinha_confluencia":true,"lt_rompimento_forte":null,"erros":null,"acertos":null,"data":"DD/MM/YYYY","notas":null,"resumo_ia":"análise aqui","score":7}`;
 
-const CHAT_SYS=`Você é a Zella, assistente de trading especializada. PERFIL: Capital $200, risco $1 (0,5%), perda máx $6/dia, Exness Zero Spread, TradingView, M2/M5. Setups: Pivot (RR 1:1) e Fibo (RR mín 3.5). Regra: 3 losses consecutivos ou -$6 = encerra e vai fazer exercício ou tocar violão. Pares Pivot: US30,EURUSD,GBPUSD,BTC,US500,USOIL,XAGUSD. Fibo: todos exceto AUDUSD e XAUUSD. Pausados: AUDUSD e XAUUSD. Aprendizados: BE precoce foi o maior destruidor em agosto; US30 melhor par no Pivot (62% WR); quintas são o melhor dia; quartas têm cuidado redobrado. Responda em português, direto e prático.`;
+const CHAT_SYS=`Você é a Zella, assistente de trading. Capital $200, risco $1, perda máx $6/dia. Setups: Pivot (RR 1:1) e Fibo (RR mín 3.5). 3 losses ou -$6 = encerra. Pares Pivot: US30,EURUSD,GBPUSD,BTC,US500,USOIL,XAGUSD. Fibo: todos exceto AUDUSD/XAUUSD. Aprendizados: BE precoce destruiu agosto; US30 melhor par Pivot (62% WR); quintas melhores; quartas cuidado. Responda em português, direto e prático.`;
 
-// ── HELPERS ────────────────────────────────────────────────────────
 function today(){return new Date().toLocaleDateString('pt-BR');}
-function weekday(s){if(!s)return'';const[d,m,y]=s.split('/');return['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][new Date(`${y}-${m}-${d}`).getDay()]||'';}
+function weekday(s){if(!s)return'';const[d,m,y]=s.split('/');const days=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];try{return days[new Date(`${y}-${m}-${d}`).getDay()]||'';}catch{return '';}}
 function fmt(n){if(n===null||n===undefined||n==='')return'—';const x=Number(n);return`${x>=0?'':'-'}$${Math.abs(x).toFixed(2)}`;}
+function getDailyPnl(trades){return trades.filter(t=>t.data===today()).reduce((s,t)=>s+(t.pnl||0),0);}
+function getConsec(trades){let c=0;for(const t of trades.filter(t=>t.data===today())){if(t.resultado==='Loss')c++;else break;}return c;}
 function calcStats(trades){
   if(!trades.length)return null;
   const wins=trades.filter(t=>t.resultado==='Win');
@@ -65,12 +81,6 @@ function calcStats(trades){
   const avgRR=rrs.length?(rrs.reduce((s,t)=>s+t.rr_realizado,0)/rrs.length).toFixed(2):'—';
   return{totalPnl,wins:wins.length,losses:losses.length,winRate:Math.round((wins.length/trades.length)*100),pf,avgRR};
 }
-function getDailyPnl(trades){return trades.filter(t=>t.data===today()).reduce((s,t)=>s+(t.pnl||0),0);}
-function getConsecLosses(trades){
-  let c=0;
-  for(const t of trades.filter(t=>t.data===today())){if(t.resultado==='Loss')c++;else break;}
-  return c;
-}
 async function callClaude(system,msg){
   const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,system,messages:[{role:'user',content:msg}]})});
   const d=await r.json();
@@ -78,324 +88,362 @@ async function callClaude(system,msg){
 }
 function parseJ(t){return JSON.parse(t.replace(/```json|```/g,'').trim());}
 
-// ── UI COMPONENTS ──────────────────────────────────────────────────
-function Badge({children,color='#334155'}){return <span style={{background:color+'22',color,border:`1px solid ${color}44`,padding:'2px 8px',borderRadius:20,fontSize:11,fontWeight:600,whiteSpace:'nowrap'}}>{children}</span>;}
-function Spinner(){return <span style={{display:'inline-block',width:13,height:13,border:'2px solid #334155',borderTop:'2px solid #6366f1',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/>;}
-function ScoreRing({score}){const color=score>=8?'#22c55e':score>=5?'#f59e0b':'#ef4444';const r=20,c=2*Math.PI*r;return<div style={{position:'relative',width:50,height:50,flexShrink:0}}><svg width={50}height={50}style={{transform:'rotate(-90deg)'}}><circle cx={25}cy={25}r={r}fill="none"stroke="#1e3a5f"strokeWidth={4}/><circle cx={25}cy={25}r={r}fill="none"stroke={color}strokeWidth={4}strokeDasharray={`${(score/10)*c} ${c}`}strokeLinecap="round"/></svg><div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',color,fontWeight:800,fontSize:13}}>{score}</div></div>;}
-function Sel({value,onChange,options,placeholder}){return<select value={value}onChange={e=>onChange(e.target.value)}style={{background:'#060d1f',border:'1px solid #1e3a5f',borderRadius:8,color:value?'#f1f5f9':'#475569',fontSize:13,padding:'8px 10px',outline:'none',width:'100%'}}>{placeholder&&<option value="">{placeholder}</option>}{options.map(o=><option key={o}value={o}>{o}</option>)}</select>;}
-function Inp({value,onChange,placeholder,type='text'}){return<input type={type}value={value}onChange={e=>onChange(e.target.value)}placeholder={placeholder}style={{background:'#060d1f',border:'1px solid #1e3a5f',borderRadius:8,color:'#f1f5f9',fontSize:13,padding:'8px 10px',outline:'none',width:'100%',fontFamily:'inherit'}}/>;}
-function Tog({value,onChange,label}){return<label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer'}}><div onClick={()=>onChange(!value)}style={{width:36,height:20,borderRadius:10,background:value?'#6366f1':'#1e3a5f',position:'relative',transition:'background 0.2s',flexShrink:0}}><div style={{width:14,height:14,borderRadius:'50%',background:'#fff',position:'absolute',top:3,left:value?18:3,transition:'left 0.2s'}}/></div>{label&&<span style={{color:'#94a3b8',fontSize:13}}>{label}</span>}</label>;}
-function PBtn({children,onClick,disabled,loading}){return<button onClick={onClick}disabled={disabled||loading}style={{background:disabled||loading?'#1e3a5f':'linear-gradient(135deg,#6366f1,#8b5cf6)',border:'none',borderRadius:8,color:'#fff',padding:'10px 20px',fontSize:13,fontWeight:700,cursor:disabled||loading?'not-allowed':'pointer',display:'flex',alignItems:'center',gap:8,opacity:disabled?0.5:1}}>{children}</button>;}
-function GBtn({children,onClick}){return<button onClick={onClick}style={{background:'none',border:'1px solid #1e3a5f',borderRadius:8,color:'#64748b',padding:'8px 14px',cursor:'pointer',fontSize:12}}>{children}</button>;}
-function Card({children,style={}}){return<div style={{background:'#0d1526',borderRadius:12,border:'1px solid #1e3a5f',padding:16,...style}}>{children}</div>;}
-function SLabel({children,color='#6366f1'}){return<div style={{color,fontSize:10,fontWeight:700,letterSpacing:0.8,marginBottom:10}}>{children}</div>;}
-function Met({label,value,color='#f1f5f9',sub}){return<div style={{background:'#0d1526',borderRadius:10,padding:'12px 14px',border:'1px solid #1e3a5f'}}><div style={{color:'#475569',fontSize:10,fontWeight:600,marginBottom:3}}>{label}</div><div style={{color,fontWeight:700,fontSize:18}}>{value}</div>{sub&&<div style={{color:'#475569',fontSize:11,marginTop:2}}>{sub}</div>}</div>;}
+// ── STATE ──────────────────────────────────────────────────────────
+let state={
+  tab:'journal',
+  trades:[],
+  bt:[],
+  showForm:false,
+  filter:{setup:'',resultado:'',days:''},
+  formMode:'texto',
+  formTxt:'',
+  formData:{par:'',setup:'',direcao:'',resultado:'',pnl:'',rr_realizado:'',fibo_nivel:'',timeframe:'',sessao:'',emocao:'',seguiu_regras:true,moveu_be_cedo:false,tinha_confluencia:true,lt_rompimento_forte:null,erros:'',acertos:'',data:today(),notas:'',resumo_ia:'',score:null},
+  formLoading:false,
+  formErr:'',
+  openTrades:{},
+  chatMsgs:[{role:'assistant',content:'Olá! Sou a Zella. Pergunta qualquer coisa sobre sua performance! 📊'}],
+  chatInput:'',
+  chatLoading:false,
+  btAdding:false,
+  btForm:{id:0,data:today(),par:'',nivel:'',tf:'',confluencias:[],tinha_lt_choch:false,retestou:false,tipo_retest:'',mm_proxima:false,mm_respeitou:'',candles_ate_alvo:'',lt_forca:'',ate_onde_foi:'',saiu_antes:false,motivo_saiu:'',contexto:'',notas:''},
+};
 
-// ── TRADE CARD ─────────────────────────────────────────────────────
-function TradeCard({trade,onDelete}){
-  const[open,setOpen]=useState(false);
-  const rc=RC[trade.resultado]||'#64748b';
-  const ec=EC[trade.emocao]||'#64748b';
-  return<div style={{background:'#0b1220',borderRadius:12,marginBottom:8,border:`1px solid ${trade.resultado==='Win'?'#22c55e33':trade.resultado==='Loss'?'#ef444433':'#1e3a5f'}`,overflow:'hidden'}}>
-    <div onClick={()=>setOpen(!open)}style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 16px',cursor:'pointer',gap:8,flexWrap:'wrap'}}>
-      <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-        <Badge color={rc}>{trade.resultado}</Badge>
-        <span style={{fontWeight:700,color:'#f1f5f9',fontSize:14}}>{trade.par}</span>
-        <Badge color='#334155'>{trade.setup}</Badge>
-        {trade.fibo_nivel&&<Badge color='#6366f1'>Fibo {trade.fibo_nivel}</Badge>}
-        {trade.direcao&&<Badge color={trade.direcao==='Compra'?'#22c55e':'#ef4444'}>{trade.direcao}</Badge>}
-        <span style={{color:'#475569',fontSize:11}}>{trade.data}{weekday(trade.data)?` · ${weekday(trade.data)}`:''}</span>
-        {trade.sessao&&<span style={{color:'#475569',fontSize:11}}>· {trade.sessao}</span>}
-        {trade.emocao&&<span style={{color:ec,fontSize:11,fontWeight:600}}>● {trade.emocao}</span>}
-        {trade.moveu_be_cedo&&<Badge color='#f59e0b'>BE precoce ⚠</Badge>}
-        {!trade.seguiu_regras&&<Badge color='#ef4444'>Fora do plano</Badge>}
-      </div>
-      <div style={{display:'flex',alignItems:'center',gap:10}}>
-        <span style={{color:rc,fontWeight:700,fontSize:15}}>{fmt(trade.pnl)}</span>
-        {trade.rr_realizado&&<span style={{color:'#64748b',fontSize:11}}>R:{trade.rr_realizado}</span>}
-        {trade.score&&<ScoreRing score={trade.score}/>}
-        <button onClick={e=>{e.stopPropagation();onDelete();}}style={{background:'none',border:'none',color:'#334155',cursor:'pointer',fontSize:18,padding:0}}>×</button>
-      </div>
-    </div>
-    {open&&<div style={{padding:'12px 16px',borderTop:'1px solid #1e3a5f',display:'grid',gap:10}}>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
-        {[['TF',trade.timeframe||'—'],['RR',trade.rr_realizado?`1:${trade.rr_realizado}`:'—'],['Confluência',trade.tinha_confluencia==null?'—':trade.tinha_confluencia?'Sim ✓':'Não ✗'],['LT Forte',trade.lt_rompimento_forte==null?'—':trade.lt_rompimento_forte?'Sim ✓':'Não ✗']].map(([l,v])=><div key={l}style={{background:'#060d1f',borderRadius:8,padding:'8px 10px'}}><div style={{color:'#475569',fontSize:10,marginBottom:2}}>{l}</div><div style={{color:'#f1f5f9',fontSize:12,fontWeight:600}}>{v}</div></div>)}
-      </div>
-      {(trade.acertos||trade.erros)&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-        {trade.acertos&&<div style={{background:'#052e16',borderRadius:8,padding:'10px 12px',border:'1px solid #22c55e33'}}><div style={{color:'#22c55e',fontSize:10,fontWeight:700,marginBottom:4}}>✓ ACERTOS</div><div style={{color:'#bbf7d0',fontSize:12}}>{trade.acertos}</div></div>}
-        {trade.erros&&<div style={{background:'#1c0606',borderRadius:8,padding:'10px 12px',border:'1px solid #ef444433'}}><div style={{color:'#ef4444',fontSize:10,fontWeight:700,marginBottom:4}}>✗ ERROS</div><div style={{color:'#fca5a5',fontSize:12}}>{trade.erros}</div></div>}
-      </div>}
-      {trade.resumo_ia&&<div style={{background:'#060d1f',borderRadius:8,padding:'10px 12px',border:'1px solid #6366f133'}}><div style={{color:'#6366f1',fontSize:10,fontWeight:700,marginBottom:4}}>⚡ ANÁLISE IA</div><div style={{color:'#cbd5e1',fontSize:12,lineHeight:1.6}}>{trade.resumo_ia}</div></div>}
-    </div>}
-  </div>;
+try{const t=localStorage.getItem('zt');if(t)state.trades=JSON.parse(t);}catch{}
+try{const b=localStorage.getItem('zb');if(b)state.bt=JSON.parse(b);}catch{}
+
+function save(){
+  try{localStorage.setItem('zt',JSON.stringify(state.trades));}catch{}
+  try{localStorage.setItem('zb',JSON.stringify(state.bt));}catch{}
 }
 
-// ── TRADE FORM ─────────────────────────────────────────────────────
-function TradeForm({onSave,onCancel}){
-  const ef=()=>({par:'',setup:'',direcao:'',resultado:'',pnl:'',rr_realizado:'',fibo_nivel:'',timeframe:'',sessao:'',emocao:'',seguiu_regras:true,moveu_be_cedo:false,tinha_confluencia:true,lt_rompimento_forte:null,erros:'',acertos:'',data:today(),notas:'',resumo_ia:'',score:null});
-  const[mode,setMode]=useState('texto');
-  const[txt,setTxt]=useState('');
-  const[form,setForm]=useState(ef());
-  const[loading,setLoading]=useState(false);
-  const[err,setErr]=useState('');
-  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
-
-  async function parse(){
-    if(!txt.trim())return;
-    setLoading(true);setErr('');
-    try{
-      const t=await callClaude(PARSE_PROMPT,txt);
-      const p=parseJ(t);
-      if(!p.data)p.data=today();
-      if(!p.pnl&&p.resultado==='Loss')p.pnl=-1;
-      if(!p.pnl&&p.resultado==='Win')p.pnl=p.rr_realizado||1;
-      setForm({...ef(),...p});setMode('manual');
-    }catch{setErr('Não consegui interpretar. Tente descrever com mais detalhes.');}
-    finally{setLoading(false);}
-  }
-
-  function save(){
-    if(!form.par||!form.setup||!form.resultado){setErr('Preencha: par, setup e resultado.');return;}
-    onSave({...form,pnl:Number(form.pnl)||0,rr_realizado:Number(form.rr_realizado)||null});
-  }
-
-  return<div style={{background:'#0d1526',borderRadius:14,padding:20,border:'1px solid #1e3a5f',marginBottom:16}}>
-    <div style={{display:'flex',gap:8,marginBottom:16}}>
-      {['texto','manual'].map(m=><button key={m}onClick={()=>setMode(m)}style={{background:mode===m?'#6366f1':'transparent',border:'1px solid '+(mode===m?'#6366f1':'#1e3a5f'),borderRadius:8,color:mode===m?'#fff':'#64748b',padding:'7px 16px',cursor:'pointer',fontSize:12,fontWeight:600}}>{m==='texto'?'✍️ Descrever':'📋 Preencher'}</button>)}
-    </div>
-    {mode==='texto'&&<div>
-      <textarea value={txt}onChange={e=>setTxt(e.target.value)}onKeyDown={e=>e.ctrlKey&&e.key==='Enter'&&parse()}placeholder={"Descreva o trade:\n\"Pivot compra EURUSD M5, win, confiante, segui o setup\"\n\"Fibo 61.8 US30, venda, loss $1, movi BE cedo demais\""}style={{width:'100%',minHeight:100,background:'#060d1f',border:'1px solid #1e3a5f',borderRadius:8,color:'#f1f5f9',fontSize:13,padding:12,resize:'vertical',fontFamily:'inherit',outline:'none',lineHeight:1.6}}/>
-      {err&&<div style={{color:'#ef4444',fontSize:12,marginTop:6}}>⚠ {err}</div>}
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:12}}>
-        <span style={{color:'#334155',fontSize:11}}>Ctrl+Enter para analisar</span>
-        <div style={{display:'flex',gap:8}}><GBtn onClick={onCancel}>Cancelar</GBtn><PBtn onClick={parse}loading={loading}disabled={!txt.trim()}>{loading?<><Spinner/> Analisando...</>:'⚡ Analisar com IA'}</PBtn></div>
-      </div>
-    </div>}
-    {mode==='manual'&&<div style={{display:'grid',gap:12}}>
-      {PAUSED.includes(form.par)&&<div style={{background:'#2d1800',border:'1px solid #f59e0b44',borderRadius:8,padding:'10px 12px'}}><span style={{color:'#f59e0b',fontSize:12}}>⚠ {form.par} está pausado</span></div>}
-      {form.resumo_ia&&<div style={{background:'#060d1f',borderRadius:8,padding:'12px 14px',border:'1px solid #6366f155'}}><div style={{color:'#6366f1',fontSize:10,fontWeight:700,marginBottom:6}}>⚡ ANÁLISE IA</div><div style={{color:'#cbd5e1',fontSize:13,lineHeight:1.6}}>{form.resumo_ia}</div>{form.score&&<div style={{color:'#94a3b8',fontSize:11,marginTop:6}}>Score: {form.score}/10</div>}</div>}
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
-        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>PAR *</label><Sel value={form.par}onChange={v=>set('par',v)}options={ALL_PAIRS}placeholder="Selecione"/></div>
-        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>SETUP *</label><Sel value={form.setup}onChange={v=>set('setup',v)}options={SETUPS}placeholder="Selecione"/></div>
-        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>RESULTADO *</label><Sel value={form.resultado}onChange={v=>set('resultado',v)}options={RESULTS}placeholder="Selecione"/></div>
-      </div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:10}}>
-        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>DIREÇÃO</label><Sel value={form.direcao}onChange={v=>set('direcao',v)}options={['Compra','Venda']}placeholder="—"/></div>
-        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>P&L ($)</label><Inp value={form.pnl}onChange={v=>set('pnl',v)}placeholder="-1.00"type="number"/></div>
-        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>RR</label><Inp value={form.rr_realizado}onChange={v=>set('rr_realizado',v)}placeholder="1.0"type="number"/></div>
-        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>DATA</label><Inp value={form.data}onChange={v=>set('data',v)}placeholder="DD/MM/YYYY"/></div>
-      </div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
-        {form.setup==='Fibo'&&<div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>NÍVEL FIBO</label><Sel value={form.fibo_nivel}onChange={v=>set('fibo_nivel',v)}options={FIBO_LEVELS}placeholder="—"/></div>}
-        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>TIMEFRAME</label><Sel value={form.timeframe}onChange={v=>set('timeframe',v)}options={TIMEFRAMES}placeholder="—"/></div>
-        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>SESSÃO</label><Sel value={form.sessao}onChange={v=>set('sessao',v)}options={SESSIONS}placeholder="—"/></div>
-        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>EMOÇÃO</label><Sel value={form.emocao}onChange={v=>set('emocao',v)}options={EMOTIONS}placeholder="—"/></div>
-      </div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,padding:'10px 0'}}>
-        <Tog value={form.seguiu_regras}onChange={v=>set('seguiu_regras',v)}label="Seguiu as regras"/>
-        <Tog value={form.tinha_confluencia}onChange={v=>set('tinha_confluencia',v)}label="Tinha confluência"/>
-        {form.setup==='Fibo'&&<Tog value={form.moveu_be_cedo}onChange={v=>set('moveu_be_cedo',v)}label="Moveu BE cedo"/>}
-        {form.setup==='Fibo'&&<Tog value={form.lt_rompimento_forte===true}onChange={v=>set('lt_rompimento_forte',v)}label="LT forte"/>}
-      </div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>ACERTOS</label><textarea value={form.acertos}onChange={e=>set('acertos',e.target.value)}style={{width:'100%',minHeight:60,background:'#060d1f',border:'1px solid #1e3a5f',borderRadius:8,color:'#f1f5f9',fontSize:12,padding:8,resize:'vertical',fontFamily:'inherit',outline:'none'}}/></div>
-        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>ERROS</label><textarea value={form.erros}onChange={e=>set('erros',e.target.value)}style={{width:'100%',minHeight:60,background:'#060d1f',border:'1px solid #1e3a5f',borderRadius:8,color:'#f1f5f9',fontSize:12,padding:8,resize:'vertical',fontFamily:'inherit',outline:'none'}}/></div>
-      </div>
-      {err&&<div style={{color:'#ef4444',fontSize:12}}>⚠ {err}</div>}
-      <div style={{display:'flex',justifyContent:'flex-end',gap:8}}><GBtn onClick={()=>setMode('texto')}>← Voltar</GBtn><GBtn onClick={onCancel}>Cancelar</GBtn><PBtn onClick={save}>💾 Salvar Trade</PBtn></div>
-    </div>}
-  </div>;
-}
-
-// ── STATS ──────────────────────────────────────────────────────────
-function Stats({trades}){
-  if(!trades.length)return<div style={{textAlign:'center',padding:48,color:'#334155'}}><div style={{fontSize:36,marginBottom:10}}>📊</div>Registre trades para ver as estatísticas</div>;
-  const s=calcStats(trades);
-  let run=0;
-  const equity=[...trades].reverse().map((t,i)=>{run+=(t.pnl||0);return{i:i+1,pnl:parseFloat(run.toFixed(2))};});
-  const dg={};
-  trades.forEach(t=>{const[d,m,y]=(t.data||'').split('/');if(!d)return;const day=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][new Date(`${y}-${m}-${d}`).getDay()]||'?';if(!dg[day])dg[day]={wins:0,losses:0,pnl:0};if(t.resultado==='Win')dg[day].wins++;if(t.resultado==='Loss')dg[day].losses++;dg[day].pnl+=(t.pnl||0);});
-  const dd=['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'].filter(d=>dg[d]).map(d=>({day:d,...dg[d],pnl:parseFloat(dg[d].pnl.toFixed(2))}));
-  function gs(arr,key){const g={};arr.forEach(t=>{const k=t[key]||'—';if(!g[k])g[k]=[];g[k].push(t);});return Object.entries(g).map(([label,ts])=>{const w=ts.filter(t=>t.resultado==='Win').length;const l=ts.filter(t=>t.resultado==='Loss').length;const p=ts.reduce((s,t)=>s+(t.pnl||0),0);return{label,w,l,p,wr:ts.length?Math.round((w/ts.length)*100):0};}).sort((a,b)=>b.p-a.p);}
-  const bePnl=trades.filter(t=>t.moveu_be_cedo&&t.resultado==='Loss').length;
-  const noRule=trades.filter(t=>!t.seguiu_regras).length;
-  const weakLT=trades.filter(t=>t.lt_rompimento_forte===false&&t.resultado==='Loss').length;
-  const TRow=({label,w,l,p,wr})=><div style={{display:'grid',gridTemplateColumns:'1fr 40px 40px 60px 50px',gap:8,alignItems:'center',padding:'9px 0',borderBottom:'1px solid #1e3a5f'}}><span style={{color:'#f1f5f9',fontSize:13}}>{label}</span><span style={{color:'#22c55e',fontSize:12,textAlign:'center'}}>{w}W</span><span style={{color:'#ef4444',fontSize:12,textAlign:'center'}}>{l}L</span><span style={{color:p>=0?'#22c55e':'#ef4444',fontSize:12,fontWeight:700}}>{fmt(p)}</span><span style={{color:wr>=50?'#22c55e':'#f59e0b',fontSize:12}}>{wr}%</span></div>;
-  return<div style={{display:'grid',gap:14}}>
-    <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
-      <Met label="P&L TOTAL"value={fmt(s.totalPnl)}color={s.totalPnl>=0?'#22c55e':'#ef4444'}/>
-      <Met label="WIN RATE"value={`${s.winRate}%`}color={s.winRate>=50?'#22c55e':'#ef4444'}sub={`${s.wins}W · ${s.losses}L`}/>
-      <Met label="PROFIT FACTOR"value={s.pf}color={parseFloat(s.pf)>=1.5?'#22c55e':'#f59e0b'}/>
-      <Met label="RR MÉDIO"value={`1:${s.avgRR}`}color="#f1f5f9"/>
-      <Met label="TRADES"value={trades.length}color="#f1f5f9"/>
-      <Met label="SCORE MÉDIO"value={`${(trades.reduce((a,t)=>a+(t.score||5),0)/trades.length).toFixed(1)}/10`}color="#6366f1"/>
-    </div>
-    <Card><SLabel>📈 CURVA DE EQUITY</SLabel><ResponsiveContainer width="100%"height={160}><LineChart data={equity}><XAxis dataKey="i"tick={{fill:'#475569',fontSize:10}}/><YAxis tick={{fill:'#475569',fontSize:10}}tickFormatter={v=>`$${v}`}/><Tooltip formatter={v=>[`$${v}`,'P&L']}contentStyle={{background:'#0d1526',border:'1px solid #1e3a5f',borderRadius:8}}/><Line type="monotone"dataKey="pnl"stroke="#6366f1"strokeWidth={2}dot={false}/></LineChart></ResponsiveContainer></Card>
-    {dd.length>0&&<Card><SLabel>📅 POR DIA DA SEMANA</SLabel><ResponsiveContainer width="100%"height={130}><BarChart data={dd}><XAxis dataKey="day"tick={{fill:'#475569',fontSize:11}}/><YAxis tick={{fill:'#475569',fontSize:10}}tickFormatter={v=>`$${v}`}/><Tooltip formatter={v=>[`$${v}`,'P&L']}contentStyle={{background:'#0d1526',border:'1px solid #1e3a5f',borderRadius:8}}/><Bar dataKey="pnl"radius={[4,4,0,0]}>{dd.map((d,i)=><Cell key={i}fill={d.day==='Qua'?'#f59e0b':d.pnl>=0?'#22c55e':'#ef4444'}/>)}</Bar></BarChart></ResponsiveContainer><div style={{color:'#475569',fontSize:10,marginTop:6}}>⚠ Quarta-feira destacada</div></Card>}
-    <Card><SLabel>💱 POR PAR</SLabel><div style={{display:'grid',gridTemplateColumns:'1fr 40px 40px 60px 50px',gap:8,marginBottom:6}}>{['Par','W','L','P&L','WR'].map(h=><span key={h}style={{color:'#475569',fontSize:10,fontWeight:700}}>{h}</span>)}</div>{gs(trades,'par').map(r=><TRow key={r.label}{...r}/>)}</Card>
-    <Card><SLabel>📐 POR SETUP</SLabel><div style={{display:'grid',gridTemplateColumns:'1fr 40px 40px 60px 50px',gap:8,marginBottom:6}}>{['Setup','W','L','P&L','WR'].map(h=><span key={h}style={{color:'#475569',fontSize:10,fontWeight:700}}>{h}</span>)}</div>{gs(trades,'setup').map(r=><TRow key={r.label}{...r}/>)}</Card>
-    {gs(trades.filter(t=>t.setup==='Fibo'),'fibo_nivel').length>0&&<Card><SLabel>🎯 FIBO POR NÍVEL</SLabel><div style={{display:'grid',gridTemplateColumns:'1fr 40px 40px 60px 50px',gap:8,marginBottom:6}}>{['Nível','W','L','P&L','WR'].map(h=><span key={h}style={{color:'#475569',fontSize:10,fontWeight:700}}>{h}</span>)}</div>{gs(trades.filter(t=>t.setup==='Fibo'),'fibo_nivel').map(r=><TRow key={r.label}label={`Fibo ${r.label}`}{...r}/>)}</Card>}
-    <Card><SLabel>🧠 POR EMOÇÃO</SLabel><div style={{display:'grid',gridTemplateColumns:'1fr 40px 40px 60px 50px',gap:8,marginBottom:6}}>{['Emoção','W','L','P&L','WR'].map(h=><span key={h}style={{color:'#475569',fontSize:10,fontWeight:700}}>{h}</span>)}</div>{gs(trades,'emocao').map(r=><TRow key={r.label}{...r}/>)}</Card>
-    <Card><SLabel color="#f59e0b">⚠ ALERTAS DE DISCIPLINA</SLabel>{[['BE precoce → Loss',bePnl,'BE cedo resultou em loss'],['Fora das regras',noRule,'Trades fora do plano'],['LT fraca → Loss (Fibo)',weakLT,'Sem rompimento de LT forte']].map(([l,v,d])=><div key={l}style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid #1e3a5f'}}><div><div style={{color:'#f1f5f9',fontSize:13}}>{l}</div><div style={{color:'#475569',fontSize:11}}>{d}</div></div><div style={{color:v>0?'#ef4444':'#22c55e',fontWeight:700,fontSize:18}}>{v}</div></div>)}</Card>
-  </div>;
-}
-
-// ── CHAT ───────────────────────────────────────────────────────────
-function Chat({trades}){
-  const[msgs,setMsgs]=useState([{role:'assistant',content:`Olá! Sou a Zella. Tenho acesso aos seus ${trades.length} trades. Pergunta qualquer coisa sobre sua performance! 📊`}]);
-  const[input,setInput]=useState('');
-  const[loading,setLoading]=useState(false);
-  const bottom=useRef(null);
-  useEffect(()=>bottom.current?.scrollIntoView({behavior:'smooth'}),[msgs]);
-  const SUGG=['Qual meu melhor par?','Estou errando no Fibo?','Como foi minha disciplina?','Qual emoção me faz perder?'];
-  async function send(msg){
-    const t=msg||input.trim();if(!t||loading)return;setInput('');
-    const ctx=trades.length?`TRADES(${trades.length}):\n${JSON.stringify(trades.slice(0,50),null,1)}\nSTATS:\n${JSON.stringify(calcStats(trades),null,1)}`:'Nenhum trade ainda.';
-    const nm=[...msgs,{role:'user',content:t}];setMsgs(nm);setLoading(true);
-    try{
-      const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,system:CHAT_SYS+'\n\nCONTEXTO:\n'+ctx,messages:nm.map(m=>({role:m.role,content:m.content}))})});
-      const d=await r.json();
-      setMsgs([...nm,{role:'assistant',content:d.content?.map(i=>i.text||'').join('')||'Erro.'}]);
-    }catch{setMsgs([...nm,{role:'assistant',content:'Erro de conexão.'}]);}
-    finally{setLoading(false);}
-  }
-  return<div style={{display:'flex',flexDirection:'column',height:500}}>
-    <div style={{flex:1,overflowY:'auto',display:'flex',flexDirection:'column',gap:10,marginBottom:12}}>
-      {msgs.map((m,i)=><div key={i}style={{maxWidth:'85%',alignSelf:m.role==='user'?'flex-end':'flex-start',background:m.role==='user'?'#1e3a5f':'#111827',border:`1px solid ${m.role==='user'?'#2d5a8f':'#1e3a5f'}`,borderRadius:12,padding:'10px 14px',color:'#e2e8f0',fontSize:13,lineHeight:1.7,whiteSpace:'pre-wrap'}}>{m.content}</div>)}
-      {loading&&<div style={{alignSelf:'flex-start',background:'#111827',border:'1px solid #1e3a5f',borderRadius:12,padding:'10px 14px'}}><Spinner/></div>}
-      <div ref={bottom}/>
-    </div>
-    {msgs.length<=2&&<div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:10}}>{SUGG.map(s=><button key={s}onClick={()=>send(s)}style={{background:'#0d1526',border:'1px solid #1e3a5f',borderRadius:20,color:'#94a3b8',padding:'5px 12px',cursor:'pointer',fontSize:11}}>{s}</button>)}</div>}
-    <div style={{display:'flex',gap:8}}>
-      <input value={input}onChange={e=>setInput(e.target.value)}onKeyDown={e=>e.key==='Enter'&&send()}placeholder="Pergunte sobre sua performance..."style={{flex:1,background:'#060d1f',border:'1px solid #1e3a5f',borderRadius:8,color:'#f1f5f9',fontSize:13,padding:'10px 14px',outline:'none',fontFamily:'inherit'}}/>
-      <button onClick={()=>send()}disabled={loading||!input.trim()}style={{background:'linear-gradient(135deg,#6366f1,#8b5cf6)',border:'none',borderRadius:8,color:'#fff',padding:'10px 16px',cursor:'pointer',fontWeight:700,fontSize:14,opacity:loading||!input.trim()?0.5:1}}>↑</button>
-    </div>
-  </div>;
-}
-
-// ── BACKTEST ───────────────────────────────────────────────────────
-function Backtest({cases,onSave,onDelete}){
-  const ec=()=>({id:Date.now(),data:today(),par:'',nivel:'',tf:'',confluencias:[],tinha_lt_choch:false,retestou:false,tipo_retest:'',mm_proxima:false,mm_respeitou:'',candles_ate_alvo:'',lt_forca:'',ate_onde_foi:'',saiu_antes:false,motivo_saiu:'',contexto:'',notas:''});
-  const[adding,setAdding]=useState(false);
-  const[form,setForm]=useState(ec());
-  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
-  const total=cases.length;
-  const wLT=cases.filter(c=>c.tinha_lt_choch).length;
-  const wRet=cases.filter(c=>c.retestou&&c.tipo_retest!=='Invalidou').length;
-  const wTgt=cases.filter(c=>c.ate_onde_foi==='0 (alvo)'||c.ate_onde_foi==='Rompeu').length;
-  const MC=({options,selected,onChange})=><div style={{display:'flex',flexWrap:'wrap',gap:6}}>{options.map(o=>{const a=selected.includes(o);return<button key={o}onClick={()=>onChange(a?selected.filter(s=>s!==o):[...selected,o])}style={{background:a?'#6366f133':'transparent',border:`1px solid ${a?'#6366f1':'#1e3a5f'}`,borderRadius:6,color:a?'#a5b4fc':'#475569',padding:'4px 10px',cursor:'pointer',fontSize:12}}>{o}</button>;})}</div>;
-  return<div style={{display:'grid',gap:14}}>
-    <Card><SLabel color="#f59e0b">📋 BACKTEST FIBO — META: 30 CASOS</SLabel>
-      <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}><div style={{flex:1,background:'#1e3a5f',borderRadius:20,height:8}}><div style={{width:`${Math.min((total/30)*100,100)}%`,background:'#6366f1',borderRadius:20,height:8,transition:'width 0.3s'}}/></div><span style={{color:'#6366f1',fontWeight:700}}>{total}/30</span></div>
-      {total>0&&<div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginTop:8}}>{[['Com LT/CHoCH',`${wLT}/${total}`,'#22c55e'],['Retest válido',`${wRet}/${total}`,'#6366f1'],['Atingiu alvo',`${wTgt}/${total}`,'#f59e0b']].map(([l,v,c])=><div key={l}style={{background:'#060d1f',borderRadius:8,padding:'8px 10px'}}><div style={{color:'#475569',fontSize:10}}>{l}</div><div style={{color:c,fontWeight:700}}>{v}</div></div>)}</div>}
-    </Card>
-    {!adding&&<PBtn onClick={()=>setAdding(true)}style={{alignSelf:'flex-start'}}>+ Adicionar Caso</PBtn>}
-    {adding&&<Card><SLabel>NOVO CASO</SLabel><div style={{display:'grid',gap:12}}>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:10}}>
-        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>DATA</label><Inp value={form.data}onChange={v=>set('data',v)}placeholder="DD/MM/YYYY"/></div>
-        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>PAR *</label><Sel value={form.par}onChange={v=>set('par',v)}options={ALL_PAIRS}placeholder="Selecione"/></div>
-        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>NÍVEL *</label><Sel value={form.nivel}onChange={v=>set('nivel',v)}options={FIBO_LEVELS}placeholder="Selecione"/></div>
-        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>TF</label><Sel value={form.tf}onChange={v=>set('tf',v)}options={TIMEFRAMES}placeholder="—"/></div>
-      </div>
-      <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:6}}>CONFLUÊNCIAS</label><MC options={FIBO_CONF}selected={form.confluencias}onChange={v=>set('confluencias',v)}/></div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-        <Tog value={form.tinha_lt_choch}onChange={v=>set('tinha_lt_choch',v)}label="Tinha LT ou CHoCH forte?"/>
-        <Tog value={form.retestou}onChange={v=>set('retestou',v)}label="Retestou antes de ir?"/>
-      </div>
-      {form.retestou&&<div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>TIPO RETEST</label><Sel value={form.tipo_retest}onChange={v=>set('tipo_retest',v)}options={RETEST_TYPES}placeholder="—"/></div>}
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-        <Tog value={form.mm_proxima}onChange={v=>set('mm_proxima',v)}label="MM20/50 próxima?"/>
-        {form.mm_proxima&&<div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>PREÇO RESPEITOU</label><Sel value={form.mm_respeitou}onChange={v=>set('mm_respeitou',v)}options={['MM antes do Fibo','Fibo exato','Passou os dois']}placeholder="—"/></div>}
-      </div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
-        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>CANDLES ATÉ ALVO</label><Inp value={form.candles_ate_alvo}onChange={v=>set('candles_ate_alvo',v)}placeholder="ex: 8"type="number"/></div>
-        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>FORÇA LT</label><Sel value={form.lt_forca}onChange={v=>set('lt_forca',v)}options={LT_STRENGTH}placeholder="—"/></div>
-        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>ATÉ ONDE FOI</label><Sel value={form.ate_onde_foi}onChange={v=>set('ate_onde_foi',v)}options={TARGETS}placeholder="—"/></div>
-      </div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-        <Tog value={form.saiu_antes}onChange={v=>set('saiu_antes',v)}label="Saiu antes do alvo?"/>
-        {form.saiu_antes&&<Inp value={form.motivo_saiu}onChange={v=>set('motivo_saiu',v)}placeholder="Por quê saiu antes?"/>}
-      </div>
-      <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>CONTEXTO</label><Sel value={form.contexto}onChange={v=>set('contexto',v)}options={CONTEXTS}placeholder="—"/></div>
-      <textarea value={form.notas}onChange={e=>set('notas',e.target.value)}placeholder="Notas..."style={{width:'100%',minHeight:60,background:'#060d1f',border:'1px solid #1e3a5f',borderRadius:8,color:'#f1f5f9',fontSize:12,padding:8,resize:'vertical',fontFamily:'inherit',outline:'none'}}/>
-      <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}><GBtn onClick={()=>{setAdding(false);setForm(ec());}}>Cancelar</GBtn><PBtn onClick={()=>{if(!form.par||!form.nivel)return;onSave({...form});setForm(ec());setAdding(false);}}>💾 Salvar</PBtn></div>
-    </div></Card>}
-    {cases.length===0&&!adding&&<div style={{textAlign:'center',padding:48,color:'#334155'}}><div style={{fontSize:32,marginBottom:8}}>🔬</div>Nenhum caso ainda. Meta: 30 casos.</div>}
-    {cases.map((c,i)=><Card key={c.id||i}><div style={{display:'flex',justifyContent:'space-between'}}><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><span style={{fontWeight:700,color:'#f1f5f9'}}>#{i+1} {c.par}</span><span style={{color:'#6366f1',fontSize:12}}>Fibo {c.nivel}</span><span style={{color:'#475569',fontSize:12}}>{c.data}</span>{c.tinha_lt_choch?<span style={{color:'#22c55e',fontSize:11}}>✓ LT/CHoCH</span>:<span style={{color:'#ef4444',fontSize:11}}>✗ Sem LT/CHoCH</span>}<span style={{color:'#f59e0b',fontSize:11}}>→ {c.ate_onde_foi||'—'}</span></div><button onClick={()=>onDelete(i)}style={{background:'none',border:'none',color:'#334155',cursor:'pointer',fontSize:16}}>×</button></div>{c.confluencias?.length>0&&<div style={{marginTop:8,display:'flex',gap:4,flexWrap:'wrap'}}>{c.confluencias.map(cf=><span key={cf}style={{background:'#1e3a5f',color:'#94a3b8',fontSize:10,padding:'2px 7px',borderRadius:10}}>{cf}</span>)}</div>}{c.notas&&<div style={{color:'#64748b',fontSize:12,marginTop:6,fontStyle:'italic'}}>📝 {c.notas}</div>}</Card>)}
-  </div>;
-}
-
-// ── APP ────────────────────────────────────────────────────────────
-function App(){
-  const[tab,setTab]=useState('journal');
-  const[trades,setTrades]=useState([]);
-  const[bt,setBt]=useState([]);
-  const[showForm,setShowForm]=useState(false);
-  const[filter,setFilter]=useState({setup:'',resultado:'',days:''});
-
-  useEffect(()=>{try{const t=localStorage.getItem('zt');if(t)setTrades(JSON.parse(t));const b=localStorage.getItem('zb');if(b)setBt(JSON.parse(b));}catch{}},[]);
-  useEffect(()=>{try{localStorage.setItem('zt',JSON.stringify(trades));}catch{}},[trades]);
-  useEffect(()=>{try{localStorage.setItem('zb',JSON.stringify(bt));}catch{}},[bt]);
-
-  const dpnl=getDailyPnl(trades);
-  const cl=getConsecLosses(trades);
-  const stats=calcStats(trades);
-  const tod=trades.filter(t=>t.data===today());
-
-  const filtered=trades.filter(t=>{
-    if(filter.setup&&t.setup!==filter.setup)return false;
-    if(filter.resultado&&t.resultado!==filter.resultado)return false;
-    if(filter.days){const[d,m,y]=(t.data||'').split('/');if(d&&new Date(`${y}-${m}-${d}`)<new Date(Date.now()-parseInt(filter.days)*86400000))return false;}
+function render(){
+  const app=document.getElementById('app');
+  const dpnl=getDailyPnl(state.trades);
+  const cl=getConsec(state.trades);
+  const stats=calcStats(state.trades);
+  const tod=state.trades.filter(t=>t.data===today());
+  const filtered=state.trades.filter(t=>{
+    if(state.filter.setup&&t.setup!==state.filter.setup)return false;
+    if(state.filter.resultado&&t.resultado!==state.filter.resultado)return false;
+    if(state.filter.days){const[d,m,y]=(t.data||'').split('/');try{if(new Date(`${y}-${m}-${d}`)<new Date(Date.now()-parseInt(state.filter.days)*86400000))return false;}catch{}}
     return true;
   });
 
-  function exportJ(){const b=new Blob([JSON.stringify({trades,bt},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`diario-${today().replace(/\//g,'-')}.json`;a.click();}
-  function importJ(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.trades)setTrades(d.trades);if(d.bt)setBt(d.bt);}catch{alert('Arquivo inválido.');}};r.readAsText(f);}
+  function badge(text,color){return `<span class="badge" style="background:${color}22;color:${color};border:1px solid ${color}44">${text}</span>`;}
+  function toggle(checked,onchange,label){return `<label class="toggle-wrap"><div class="toggle-track" style="background:${checked?'#6366f1':'#1e3a5f'}" onclick="${onchange}"><div class="toggle-thumb" style="left:${checked?18:3}px"></div></div>${label?`<span style="color:#94a3b8;font-size:13px">${label}</span>`:''}</label>`;}
+  function sel(val,opts,onchange,placeholder=''){return `<select onchange="${onchange}"><option value="">${placeholder}</option>${opts.map(o=>`<option value="${o}"${val===o?'selected':''}>${o}</option>`).join('')}</select>`;}
+  function inp(val,onchange,placeholder='',type='text'){return `<input type="${type}" value="${val||''}" oninput="${onchange}" placeholder="${placeholder}">`;}
 
-  const TABS=[{id:'journal',label:'📝 Diário'},{id:'stats',label:'📊 Stats'},{id:'backtest',label:'🔬 Backtest'},{id:'chat',label:'💬 Zella IA'}];
+  // Header
+  let html=`
+  <div style="background:#080f23;border-bottom:1px solid #1e3a5f;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;margin:-20px -20px 0;position:sticky;top:0;z-index:100">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="width:34px;height:34px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px">Z</div>
+      <div><div style="font-weight:800;font-size:16px">Diário <span style="color:#6366f1">Zella</span></div><div style="color:#334155;font-size:10px">Exness Zero · TradingView · M2/M5</div></div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <label class="btn-ghost" style="font-size:11px;padding:6px 12px;cursor:pointer">📥 Importar<input type="file" accept=".json" onchange="importJ(event)" style="display:none;width:auto"></label>
+      <button class="btn-ghost" onclick="exportJ()" style="font-size:11px;padding:6px 12px">📤 Exportar</button>
+    </div>
+  </div>`;
 
-  return<div style={{minHeight:'100vh',background:'#060d1f',color:'#f1f5f9',fontFamily:'system-ui,-apple-system,sans-serif'}}>
-    {/* Header */}
-    <div style={{background:'#080f23',borderBottom:'1px solid #1e3a5f',padding:'12px 20px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-      <div style={{display:'flex',alignItems:'center',gap:10}}>
-        <div style={{width:34,height:34,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:16}}>Z</div>
-        <div><div style={{fontWeight:800,fontSize:16}}>Diário <span style={{color:'#6366f1'}}>Zella</span></div><div style={{color:'#334155',fontSize:10}}>Exness Zero · TradingView · M2/M5</div></div>
+  // Stats bar
+  html+=`<div class="stats-bar" style="margin:0 -20px">
+    ${[['P&L Total',fmt(stats?.totalPnl??0),(stats?.totalPnl??0)>=0?'#22c55e':'#ef4444'],['Win Rate',stats?`${stats.winRate}%`:'—',(stats?.winRate??0)>=50?'#22c55e':'#ef4444'],['Profit Factor',stats?.pf??'—',parseFloat(stats?.pf)>=1.5?'#22c55e':'#f59e0b'],['Hoje',fmt(dpnl),dpnl>=0?'#22c55e':'#ef4444'],['Losses consec.',cl,cl>=2?'#ef4444':'#f1f5f9'],['Capital',`$${CAPITAL}`,'#6366f1']].map(([l,v,c])=>`<div style="flex-shrink:0"><div style="color:#334155;font-size:10px;font-weight:600">${l}</div><div style="color:${c};font-weight:700;font-size:15px">${v}</div></div>`).join('')}
+  </div>`;
+
+  // Alert
+  if(dpnl<=-MAX_LOSS||cl>=MAX_CONSEC){
+    html+=`<div class="alert"><span style="font-size:20px">🛑</span><div><div style="color:#ef4444;font-weight:700;font-size:14px">ENCERRE O DIA AGORA</div><div style="color:#fca5a5;font-size:12px;margin-top:2px">${cl>=MAX_CONSEC?`${cl} losses consecutivos. `:''}${dpnl<=-MAX_LOSS?`Perda ${fmt(dpnl)} atingida. `:''}Fecha o gráfico. Vai fazer exercício ou tocar violão. 🎸</div></div></div>`;
+  }
+
+  // Tabs
+  html+=`<div style="background:#080f23;border-bottom:1px solid #1e3a5f;display:flex;overflow-x:auto;margin:0 -20px">
+    ${[['journal','📝 Diário'],['stats','📊 Stats'],['backtest','🔬 Backtest'],['chat','💬 Zella IA']].map(([id,label])=>`<button class="tab${state.tab===id?' active':''}" onclick="setTab('${id}')">${label}</button>`).join('')}
+  </div><div style="max-width:860px;margin:0 auto;padding-top:20px">`;
+
+  // ── JOURNAL TAB
+  if(state.tab==='journal'){
+    if(!state.showForm){
+      html+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><div style="color:#475569;font-size:12px">${state.trades.length} trades · ${tod.length} hoje</div><button class="btn-primary" onclick="showForm()">+ Registrar Trade</button></div>`;
+    } else {
+      html+=`<div class="card" style="margin-bottom:16px">
+        <div style="display:flex;gap:8px;margin-bottom:16px">
+          ${['texto','manual'].map(m=>`<button onclick="setFormMode('${m}')" style="background:${state.formMode===m?'#6366f1':'transparent'};border:1px solid ${state.formMode===m?'#6366f1':'#1e3a5f'};border-radius:8px;color:${state.formMode===m?'#fff':'#64748b'};padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600">${m==='texto'?'✍️ Descrever':'📋 Preencher'}</button>`).join('')}
+        </div>`;
+      if(state.formMode==='texto'){
+        html+=`<textarea oninput="setFormTxt(this.value)" placeholder="Descreva o trade:&#10;&#10;&quot;Pivot compra EURUSD M5, win, confiante, segui o setup&quot;&#10;&quot;Fibo 61.8 US30, venda, loss $1, movi BE cedo demais&quot;" style="width:100%;min-height:100px;resize:vertical">${state.formTxt}</textarea>
+          ${state.formErr?`<div style="color:#ef4444;font-size:12px;margin-top:6px">⚠ ${state.formErr}</div>`:''}
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
+            <span style="color:#334155;font-size:11px">Ctrl+Enter para analisar</span>
+            <div style="display:flex;gap:8px"><button class="btn-ghost" onclick="hideForm()">Cancelar</button><button class="btn-primary" onclick="parseForm()" ${state.formLoading||!state.formTxt.trim()?'disabled':''}>${state.formLoading?'<span class="spinner"></span> Analisando...':'⚡ Analisar com IA'}</button></div>
+          </div>`;
+      } else {
+        const f=state.formData;
+        html+=`<div style="display:grid;gap:12px">
+          ${PAUSED.includes(f.par)?`<div style="background:#2d1800;border:1px solid #f59e0b44;border-radius:8px;padding:10px 12px"><span style="color:#f59e0b;font-size:12px">⚠ ${f.par} está pausado</span></div>`:''}
+          ${f.resumo_ia?`<div style="background:#060d1f;border-radius:8px;padding:12px 14px;border:1px solid #6366f155"><div style="color:#6366f1;font-size:10px;font-weight:700;margin-bottom:6px">⚡ ANÁLISE IA</div><div style="color:#cbd5e1;font-size:13px;line-height:1.6">${f.resumo_ia}</div>${f.score?`<div style="color:#94a3b8;font-size:11px;margin-top:6px">Score: ${f.score}/10</div>`:''}</div>`:''}
+          <div class="grid3">
+            <div><label class="label">PAR *</label>${sel(f.par,ALL_PAIRS,"setFD('par',this.value)",'Selecione')}</div>
+            <div><label class="label">SETUP *</label>${sel(f.setup,SETUPS,"setFD('setup',this.value)",'Selecione')}</div>
+            <div><label class="label">RESULTADO *</label>${sel(f.resultado,RESULTS,"setFD('resultado',this.value)",'Selecione')}</div>
+          </div>
+          <div class="grid4">
+            <div><label class="label">DIREÇÃO</label>${sel(f.direcao,['Compra','Venda'],"setFD('direcao',this.value)",'—')}</div>
+            <div><label class="label">P&L ($)</label>${inp(f.pnl,"setFD('pnl',this.value)",'-1.00','number')}</div>
+            <div><label class="label">RR</label>${inp(f.rr_realizado,"setFD('rr_realizado',this.value)",'1.0','number')}</div>
+            <div><label class="label">DATA</label>${inp(f.data,"setFD('data',this.value)",'DD/MM/YYYY')}</div>
+          </div>
+          <div class="grid3">
+            ${f.setup==='Fibo'?`<div><label class="label">NÍVEL FIBO</label>${sel(f.fibo_nivel,FIBO_LVL,"setFD('fibo_nivel',this.value)",'—')}</div>`:''}
+            <div><label class="label">TIMEFRAME</label>${sel(f.timeframe,TFS,"setFD('timeframe',this.value)",'—')}</div>
+            <div><label class="label">SESSÃO</label>${sel(f.sessao,SESS,"setFD('sessao',this.value)",'—')}</div>
+            <div><label class="label">EMOÇÃO</label>${sel(f.emocao,EMOTS,"setFD('emocao',this.value)",'—')}</div>
+          </div>
+          <div class="grid3" style="padding:10px 0">
+            ${toggle(f.seguiu_regras,"toggleFD('seguiu_regras')",'Seguiu as regras')}
+            ${toggle(f.tinha_confluencia,"toggleFD('tinha_confluencia')",'Tinha confluência')}
+            ${f.setup==='Fibo'?toggle(f.moveu_be_cedo,"toggleFD('moveu_be_cedo')",'Moveu BE cedo'):''}
+            ${f.setup==='Fibo'?toggle(f.lt_rompimento_forte===true,"toggleFD('lt_rompimento_forte')",'LT forte'):''}
+          </div>
+          <div class="grid2">
+            <div><label class="label">ACERTOS</label><textarea oninput="setFD('acertos',this.value)" style="min-height:60px;resize:vertical">${f.acertos||''}</textarea></div>
+            <div><label class="label">ERROS</label><textarea oninput="setFD('erros',this.value)" style="min-height:60px;resize:vertical">${f.erros||''}</textarea></div>
+          </div>
+          ${state.formErr?`<div style="color:#ef4444;font-size:12px">⚠ ${state.formErr}</div>`:''}
+          <div style="display:flex;justify-content:flex-end;gap:8px">
+            <button class="btn-ghost" onclick="setFormMode('texto')">← Voltar</button>
+            <button class="btn-ghost" onclick="hideForm()">Cancelar</button>
+            <button class="btn-primary" onclick="saveTrade()">💾 Salvar Trade</button>
+          </div>
+        </div>`;
+      }
+      html+=`</div>`;
+    }
+
+    // Filters
+    if(state.trades.length){
+      html+=`<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+        <select onchange="setFilter('setup',this.value)" style="width:auto"><option value="">Setup: Todos</option>${SETUPS.map(o=>`<option value="${o}"${state.filter.setup===o?'selected':''}>${o}</option>`).join('')}</select>
+        <select onchange="setFilter('resultado',this.value)" style="width:auto"><option value="">Resultado: Todos</option>${RESULTS.map(o=>`<option value="${o}"${state.filter.resultado===o?'selected':''}>${o}</option>`).join('')}</select>
+        <select onchange="setFilter('days',this.value)" style="width:auto"><option value="">Período: Todos</option>${['7','30','90'].map(o=>`<option value="${o}"${state.filter.days===o?'selected':''}>Últimos ${o} dias</option>`).join('')}</select>
+        ${Object.values(state.filter).some(Boolean)?`<button class="btn-ghost" onclick="clearFilter()">Limpar</button>`:''}
+        <span style="color:#334155;font-size:11px;align-self:center">${filtered.length} trades</span>
+      </div>`;
+    }
+
+    if(!filtered.length&&!state.showForm){
+      html+=`<div style="text-align:center;padding:48px 24px;color:#334155;background:#0d1526;border-radius:14px;border:1px dashed #1e3a5f"><div style="font-size:36px;margin-bottom:10px">📈</div><div style="font-weight:700;font-size:15px;margin-bottom:6px;color:#475569">${state.trades.length===0?'Nenhum trade ainda':'Sem trades com esse filtro'}</div><div style="font-size:13px">${state.trades.length===0?'Clique em "+ Registrar Trade"':'Tente ajustar os filtros'}</div></div>`;
+    }
+
+    filtered.forEach((t,i)=>{
+      const rc=RC[t.resultado]||'#64748b';
+      const ec=EC[t.emocao]||'#64748b';
+      const idx=state.trades.indexOf(t);
+      const open=state.openTrades[idx];
+      html+=`<div class="trade-card" style="border:1px solid ${t.resultado==='Win'?'#22c55e33':t.resultado==='Loss'?'#ef444433':'#1e3a5f'}">
+        <div class="trade-row" onclick="toggleTrade(${idx})">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            ${badge(t.resultado,rc)}
+            <span style="font-weight:700;color:#f1f5f9;font-size:14px">${t.par}</span>
+            ${badge(t.setup,'#334155')}
+            ${t.fibo_nivel?badge('Fibo '+t.fibo_nivel,'#6366f1'):''}
+            ${t.direcao?badge(t.direcao,t.direcao==='Compra'?'#22c55e':'#ef4444'):''}
+            <span style="color:#475569;font-size:11px">${t.data}${weekday(t.data)?' · '+weekday(t.data):''}</span>
+            ${t.sessao?`<span style="color:#475569;font-size:11px">· ${t.sessao}</span>`:''}
+            ${t.emocao?`<span style="color:${ec};font-size:11px;font-weight:600">● ${t.emocao}</span>`:''}
+            ${t.moveu_be_cedo?badge('BE precoce ⚠','#f59e0b'):''}
+            ${!t.seguiu_regras?badge('Fora do plano','#ef4444'):''}
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="color:${rc};font-weight:700;font-size:15px">${fmt(t.pnl)}</span>
+            ${t.rr_realizado?`<span style="color:#64748b;font-size:11px">R:${t.rr_realizado}</span>`:''}
+            <button onclick="event.stopPropagation();deleteTrade(${idx})" style="background:none;border:none;color:#334155;cursor:pointer;font-size:18px;padding:0">×</button>
+          </div>
+        </div>
+        ${open?`<div class="trade-detail">
+          <div class="grid4">
+            ${[['TF',t.timeframe||'—'],['RR',t.rr_realizado?`1:${t.rr_realizado}`:'—'],['Confluência',t.tinha_confluencia==null?'—':t.tinha_confluencia?'Sim ✓':'Não ✗'],['LT Forte',t.lt_rompimento_forte==null?'—':t.lt_rompimento_forte?'Sim ✓':'Não ✗']].map(([l,v])=>`<div style="background:#060d1f;border-radius:8px;padding:8px 10px"><div style="color:#475569;font-size:10px;margin-bottom:2px">${l}</div><div style="color:#f1f5f9;font-size:12px;font-weight:600">${v}</div></div>`).join('')}
+          </div>
+          ${(t.acertos||t.erros)?`<div class="grid2">${t.acertos?`<div style="background:#052e16;border-radius:8px;padding:10px 12px;border:1px solid #22c55e33"><div style="color:#22c55e;font-size:10px;font-weight:700;margin-bottom:4px">✓ ACERTOS</div><div style="color:#bbf7d0;font-size:12px">${t.acertos}</div></div>`:''}${t.erros?`<div style="background:#1c0606;border-radius:8px;padding:10px 12px;border:1px solid #ef444433"><div style="color:#ef4444;font-size:10px;font-weight:700;margin-bottom:4px">✗ ERROS</div><div style="color:#fca5a5;font-size:12px">${t.erros}</div></div>`:''}</div>`:''}
+          ${t.resumo_ia?`<div style="background:#060d1f;border-radius:8px;padding:10px 12px;border:1px solid #6366f133"><div style="color:#6366f1;font-size:10px;font-weight:700;margin-bottom:4px">⚡ ANÁLISE IA</div><div style="color:#cbd5e1;font-size:12px;line-height:1.6">${t.resumo_ia}</div></div>`:''}
+        </div>`:''}
+      </div>`;
+    });
+  }
+
+  // ── STATS TAB
+  else if(state.tab==='stats'){
+    if(!state.trades.length){html+=`<div style="text-align:center;padding:48px;color:#334155"><div style="font-size:36px;margin-bottom:10px">📊</div>Registre trades para ver as estatísticas</div>`;}
+    else{
+      const s=calcStats(state.trades);
+      html+=`<div class="grid3" style="margin-bottom:14px">
+        ${[['P&L TOTAL',fmt(s.totalPnl),s.totalPnl>=0?'#22c55e':'#ef4444',''],['WIN RATE',`${s.winRate}%`,s.winRate>=50?'#22c55e':'#ef4444',`${s.wins}W · ${s.losses}L`],['PROFIT FACTOR',s.pf,parseFloat(s.pf)>=1.5?'#22c55e':'#f59e0b',''],['RR MÉDIO',`1:${s.avgRR}`,'#f1f5f9',''],['TRADES',state.trades.length,'#f1f5f9',''],['SCORE MÉDIO',`${(state.trades.reduce((a,t)=>a+(t.score||5),0)/state.trades.length).toFixed(1)}/10`,'#6366f1','']].map(([l,v,c,sub])=>`<div class="metric"><div style="color:#475569;font-size:10px;font-weight:600;margin-bottom:3px">${l}</div><div style="color:${c};font-weight:700;font-size:18px">${v}</div>${sub?`<div style="color:#475569;font-size:11px;margin-top:2px">${sub}</div>`:''}</div>`).join('')}
+      </div>`;
+
+      function groupStats(arr,key){
+        const g={};arr.forEach(t=>{const k=t[key]||'—';if(!g[k])g[k]=[];g[k].push(t);});
+        return Object.entries(g).map(([label,ts])=>{const w=ts.filter(t=>t.resultado==='Win').length;const l=ts.filter(t=>t.resultado==='Loss').length;const p=ts.reduce((s,t)=>s+(t.pnl||0),0);return{label,w,l,p,wr:ts.length?Math.round((w/ts.length)*100):0};}).sort((a,b)=>b.p-a.p);
+      }
+      function tTable(title,rows){
+        return`<div class="card"><div class="section-label">${title}</div><div style="display:grid;grid-template-columns:1fr 40px 40px 60px 50px;gap:8px;margin-bottom:6px">${['','W','L','P&L','WR'].map(h=>`<span style="color:#475569;font-size:10px;font-weight:700">${h}</span>`).join('')}</div>${rows.map(r=>`<div style="display:grid;grid-template-columns:1fr 40px 40px 60px 50px;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid #1e3a5f"><span style="color:#f1f5f9;font-size:13px">${r.label}</span><span style="color:#22c55e;font-size:12px;text-align:center">${r.w}W</span><span style="color:#ef4444;font-size:12px;text-align:center">${r.l}L</span><span style="color:${r.p>=0?'#22c55e':'#ef4444'};font-size:12px;font-weight:700">${fmt(r.p)}</span><span style="color:${r.wr>=50?'#22c55e':'#f59e0b'};font-size:12px">${r.wr}%</span></div>`).join('')}</div>`;
+      }
+
+      html+=tTable('💱 POR PAR',groupStats(state.trades,'par'));
+      html+=tTable('📐 POR SETUP',groupStats(state.trades,'setup'));
+      const fibo=groupStats(state.trades.filter(t=>t.setup==='Fibo'),'fibo_nivel');
+      if(fibo.length)html+=tTable('🎯 FIBO POR NÍVEL',fibo.map(r=>({...r,label:'Fibo '+r.label})));
+      html+=tTable('🧠 POR EMOÇÃO',groupStats(state.trades,'emocao'));
+
+      const bePnl=state.trades.filter(t=>t.moveu_be_cedo&&t.resultado==='Loss').length;
+      const noRule=state.trades.filter(t=>!t.seguiu_regras).length;
+      const weakLT=state.trades.filter(t=>t.lt_rompimento_forte===false&&t.resultado==='Loss').length;
+      html+=`<div class="card"><div class="section-label" style="color:#f59e0b">⚠ ALERTAS DE DISCIPLINA</div>${[['BE precoce → Loss',bePnl,'BE cedo resultou em loss'],['Fora das regras',noRule,'Trades fora do plano'],['LT fraca → Loss (Fibo)',weakLT,'Sem rompimento de LT forte']].map(([l,v,d])=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #1e3a5f"><div><div style="color:#f1f5f9;font-size:13px">${l}</div><div style="color:#475569;font-size:11px">${d}</div></div><div style="color:${v>0?'#ef4444':'#22c55e'};font-weight:700;font-size:18px">${v}</div></div>`).join('')}</div>`;
+    }
+  }
+
+  // ── BACKTEST TAB
+  else if(state.tab==='backtest'){
+    const total=state.bt.length;
+    const wLT=state.bt.filter(c=>c.tinha_lt_choch).length;
+    const wRet=state.bt.filter(c=>c.retestou&&c.tipo_retest!=='Invalidou').length;
+    const wTgt=state.bt.filter(c=>c.ate_onde_foi==='0 (alvo)'||c.ate_onde_foi==='Rompeu').length;
+    html+=`<div class="card"><div class="section-label" style="color:#f59e0b">📋 BACKTEST FIBO — META: 30 CASOS</div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px"><div style="flex:1;background:#1e3a5f;border-radius:20px;height:8px"><div style="width:${Math.min((total/30)*100,100)}%;background:#6366f1;border-radius:20px;height:8px"></div></div><span style="color:#6366f1;font-weight:700">${total}/30</span></div>
+      ${total>0?`<div class="grid3">${[['Com LT/CHoCH',`${wLT}/${total}`,'#22c55e'],['Retest válido',`${wRet}/${total}`,'#6366f1'],['Atingiu alvo',`${wTgt}/${total}`,'#f59e0b']].map(([l,v,c])=>`<div style="background:#060d1f;border-radius:8px;padding:8px 10px"><div style="color:#475569;font-size:10px">${l}</div><div style="color:${c};font-weight:700">${v}</div></div>`).join('')}</div>`:''}
+    </div>`;
+    if(!state.btAdding)html+=`<button class="btn-primary" onclick="setBtAdding(true)" style="margin-bottom:14px">+ Adicionar Caso</button>`;
+    if(state.btAdding){
+      const f=state.btForm;
+      html+=`<div class="card" style="margin-bottom:14px"><div class="section-label">NOVO CASO</div><div style="display:grid;gap:12px">
+        <div class="grid4">
+          <div><label class="label">DATA</label>${inp(f.data,"setBtF('data',this.value)",'DD/MM/YYYY')}</div>
+          <div><label class="label">PAR *</label>${sel(f.par,ALL_PAIRS,"setBtF('par',this.value)",'Selecione')}</div>
+          <div><label class="label">NÍVEL *</label>${sel(f.nivel,FIBO_LVL,"setBtF('nivel',this.value)",'Selecione')}</div>
+          <div><label class="label">TF</label>${sel(f.tf,TFS,"setBtF('tf',this.value)",'—')}</div>
+        </div>
+        <div><label class="label">CONFLUÊNCIAS</label><div style="display:flex;flex-wrap:wrap;gap:6px">${FIBO_CONF.map(o=>`<button onclick="toggleConf('${o}')" style="background:${f.confluencias.includes(o)?'#6366f133':'transparent'};border:1px solid ${f.confluencias.includes(o)?'#6366f1':'#1e3a5f'};border-radius:6px;color:${f.confluencias.includes(o)?'#a5b4fc':'#475569'};padding:4px 10px;cursor:pointer;font-size:12px">${o}</button>`).join('')}</div></div>
+        <div class="grid2">
+          ${toggle(f.tinha_lt_choch,"toggleBtF('tinha_lt_choch')",'Tinha LT ou CHoCH?')}
+          ${toggle(f.retestou,"toggleBtF('retestou')",'Retestou antes?')}
+        </div>
+        ${f.retestou?`<div><label class="label">TIPO RETEST</label>${sel(f.tipo_retest,RETEST,"setBtF('tipo_retest',this.value)",'—')}</div>`:''}
+        <div class="grid2">
+          ${toggle(f.mm_proxima,"toggleBtF('mm_proxima')",'MM20/50 próxima?')}
+          ${f.mm_proxima?`<div><label class="label">PREÇO RESPEITOU</label>${sel(f.mm_respeitou,['MM antes do Fibo','Fibo exato','Passou os dois'],"setBtF('mm_respeitou',this.value)",'—')}</div>`:''}
+        </div>
+        <div class="grid3">
+          <div><label class="label">CANDLES ATÉ ALVO</label>${inp(f.candles_ate_alvo,"setBtF('candles_ate_alvo',this.value)",'ex: 8','number')}</div>
+          <div><label class="label">FORÇA LT</label>${sel(f.lt_forca,LT_STR,"setBtF('lt_forca',this.value)",'—')}</div>
+          <div><label class="label">ATÉ ONDE FOI</label>${sel(f.ate_onde_foi,TGTS,"setBtF('ate_onde_foi',this.value)",'—')}</div>
+        </div>
+        <div class="grid2">
+          ${toggle(f.saiu_antes,"toggleBtF('saiu_antes')",'Saiu antes?')}
+          ${f.saiu_antes?inp(f.motivo_saiu,"setBtF('motivo_saiu',this.value)",'Por quê saiu antes?'):''}
+        </div>
+        <div><label class="label">CONTEXTO</label>${sel(f.contexto,CTXS,"setBtF('contexto',this.value)",'—')}</div>
+        <textarea oninput="setBtF('notas',this.value)" placeholder="Notas..." style="min-height:60px;resize:vertical">${f.notas||''}</textarea>
+        <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn-ghost" onclick="setBtAdding(false)">Cancelar</button><button class="btn-primary" onclick="saveBt()">💾 Salvar</button></div>
+      </div></div>`;
+    }
+    if(!state.bt.length&&!state.btAdding)html+=`<div style="text-align:center;padding:48px;color:#334155"><div style="font-size:32px;margin-bottom:8px">🔬</div>Nenhum caso ainda. Meta: 30 casos.</div>`;
+    state.bt.forEach((c,i)=>{
+      html+=`<div class="card"><div style="display:flex;justify-content:space-between"><div style="display:flex;gap:8px;flex-wrap:wrap"><span style="font-weight:700;color:#f1f5f9">#${i+1} ${c.par}</span><span style="color:#6366f1;font-size:12px">Fibo ${c.nivel}</span><span style="color:#475569;font-size:12px">${c.data}</span>${c.tinha_lt_choch?'<span style="color:#22c55e;font-size:11px">✓ LT/CHoCH</span>':'<span style="color:#ef4444;font-size:11px">✗ Sem LT</span>'}<span style="color:#f59e0b;font-size:11px">→ ${c.ate_onde_foi||'—'}</span></div><button onclick="deleteBt(${i})" style="background:none;border:none;color:#334155;cursor:pointer;font-size:16px">×</button></div>${c.confluencias?.length?`<div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap">${c.confluencias.map(cf=>`<span style="background:#1e3a5f;color:#94a3b8;font-size:10px;padding:2px 7px;border-radius:10px">${cf}</span>`).join('')}</div>`:''} ${c.notas?`<div style="color:#64748b;font-size:12px;margin-top:6px;font-style:italic">📝 ${c.notas}</div>`:''}</div>`;
+    });
+  }
+
+  // ── CHAT TAB
+  else if(state.tab==='chat'){
+    html+=`<div class="card"><div class="section-label">💬 ZELLA — SUA IA DE TRADING</div>
+      <div id="chat-msgs" style="height:400px;overflow-y:auto;display:flex;flex-direction:column;margin-bottom:12px">
+        ${state.chatMsgs.map(m=>`<div class="chat-msg" style="align-self:${m.role==='user'?'flex-end':'flex-start'};background:${m.role==='user'?'#1e3a5f':'#111827'};border:1px solid ${m.role==='user'?'#2d5a8f':'#1e3a5f'};color:#e2e8f0">${m.content.replace(/\n/g,'<br>')}</div>`).join('')}
+        ${state.chatLoading?'<div class="chat-msg" style="align-self:flex-start;background:#111827;border:1px solid #1e3a5f"><span class="spinner"></span></div>':''}
       </div>
-      <div style={{display:'flex',gap:8}}>
-        <label style={{background:'#0d1526',border:'1px solid #1e3a5f',borderRadius:7,color:'#64748b',padding:'6px 12px',cursor:'pointer',fontSize:11}}>📥 Importar<input type="file"accept=".json"onChange={importJ}style={{display:'none'}}/></label>
-        <button onClick={exportJ}style={{background:'none',border:'1px solid #1e3a5f',borderRadius:8,color:'#64748b',padding:'6px 12px',cursor:'pointer',fontSize:11}}>📤 Exportar</button>
+      ${state.chatMsgs.length<=2?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${['Qual meu melhor par?','Estou errando no Fibo?','Como foi minha disciplina?','Qual emoção me faz perder?'].map(s=>`<button onclick="sendChat('${s}')" style="background:#0d1526;border:1px solid #1e3a5f;border-radius:20px;color:#94a3b8;padding:5px 12px;cursor:pointer;font-size:11px">${s}</button>`).join('')}</div>`:''}
+      <div style="display:flex;gap:8px">
+        <input id="chat-input" value="${state.chatInput}" oninput="state.chatInput=this.value" onkeydown="if(event.key==='Enter')sendChat()" placeholder="Pergunte sobre sua performance..." style="flex:1">
+        <button onclick="sendChat()" ${state.chatLoading?'disabled':''} style="background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;border-radius:8px;color:#fff;padding:10px 16px;cursor:pointer;font-weight:700;font-size:14px;opacity:${state.chatLoading?0.5:1}">↑</button>
       </div>
-    </div>
-    {/* Stats bar */}
-    <div style={{background:'#08111f',borderBottom:'1px solid #1e3a5f',padding:'10px 20px',display:'flex',gap:24,overflowX:'auto'}}>
-      {[['P&L Total',fmt(stats?.totalPnl??0),(stats?.totalPnl??0)>=0?'#22c55e':'#ef4444'],['Win Rate',stats?`${stats.winRate}%`:'—',(stats?.winRate??0)>=50?'#22c55e':'#ef4444'],['Profit Factor',stats?.pf??'—',parseFloat(stats?.pf)>=1.5?'#22c55e':'#f59e0b'],['Hoje',fmt(dpnl),dpnl>=0?'#22c55e':'#ef4444'],['Losses consec.',cl,cl>=2?'#ef4444':'#f1f5f9'],['Capital',`$${CAPITAL}`,'#6366f1']].map(([l,v,c])=><div key={l}style={{flexShrink:0}}><div style={{color:'#334155',fontSize:10,fontWeight:600}}>{l}</div><div style={{color:c,fontWeight:700,fontSize:15}}>{v}</div></div>)}
-    </div>
-    {/* Alert */}
-    {(dpnl<=-MAX_DAILY_LOSS||cl>=MAX_CONSEC)&&<div style={{background:'#2d0606',border:'1px solid #ef4444',borderRadius:10,padding:'12px 16px',margin:'12px 16px',display:'flex',alignItems:'center',gap:10}}><span style={{fontSize:20}}>🛑</span><div><div style={{color:'#ef4444',fontWeight:700,fontSize:14}}>ENCERRE O DIA AGORA</div><div style={{color:'#fca5a5',fontSize:12,marginTop:2}}>{cl>=MAX_CONSEC?`${cl} losses consecutivos. `:''}${dpnl<=-MAX_DAILY_LOSS?`Perda de ${fmt(dpnl)} atingida. `:''}Fecha o gráfico. Vai fazer exercício ou tocar violão. 🎸</div></div></div>}
-    {/* Tabs */}
-    <div style={{background:'#080f23',borderBottom:'1px solid #1e3a5f',display:'flex',overflowX:'auto'}}>
-      {TABS.map(t=><button key={t.id}onClick={()=>setTab(t.id)}style={{background:'none',border:'none',borderBottom:`2px solid ${tab===t.id?'#6366f1':'transparent'}`,color:tab===t.id?'#6366f1':'#475569',padding:'11px 18px',cursor:'pointer',fontWeight:600,fontSize:13,whiteSpace:'nowrap'}}>{t.label}</button>)}
-    </div>
-    {/* Content */}
-    <div style={{maxWidth:860,margin:'0 auto',padding:'20px 16px'}}>
-      {tab==='journal'&&<div>
-        {!showForm?<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}><div style={{color:'#475569',fontSize:12}}>{trades.length} trades · {tod.length} hoje</div><PBtn onClick={()=>setShowForm(true)}>+ Registrar Trade</PBtn></div>:<TradeForm onSave={t=>{setTrades(p=>[t,...p]);setShowForm(false);}} onCancel={()=>setShowForm(false)}/>}
-        {trades.length>0&&<div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
-          {[{k:'setup',opts:['Pivot','Fibo']},{k:'resultado',opts:['Win','Loss','BE']},{k:'days',opts:['7','30','90']}].map(({k,opts})=><select key={k}value={filter[k]}onChange={e=>setFilter(f=>({...f,[k]:e.target.value}))}style={{background:'#0d1526',border:'1px solid #1e3a5f',borderRadius:8,color:filter[k]?'#f1f5f9':'#475569',fontSize:12,padding:'6px 10px',outline:'none'}}><option value="">{k==='days'?'Período':k==='setup'?'Setup':'Resultado'}: Todos</option>{opts.map(o=><option key={o}value={o}>{k==='days'?`Últimos ${o} dias`:o}</option>)}</select>)}
-          {Object.values(filter).some(Boolean)&&<button onClick={()=>setFilter({setup:'',resultado:'',days:''})}style={{background:'none',border:'1px solid #1e3a5f',borderRadius:8,color:'#64748b',padding:'6px 10px',cursor:'pointer',fontSize:11}}>Limpar</button>}
-          <span style={{color:'#334155',fontSize:11,alignSelf:'center'}}>{filtered.length} trades</span>
-        </div>}
-        {filtered.length===0&&!showForm&&<div style={{textAlign:'center',padding:'48px 24px',color:'#334155',background:'#0d1526',borderRadius:14,border:'1px dashed #1e3a5f'}}><div style={{fontSize:36,marginBottom:10}}>📈</div><div style={{fontWeight:700,fontSize:15,marginBottom:6,color:'#475569'}}>{trades.length===0?'Nenhum trade ainda':'Sem trades com esse filtro'}</div><div style={{fontSize:13}}>{trades.length===0?'Clique em "+ Registrar Trade"':'Tente ajustar os filtros'}</div></div>}
-        {filtered.map((t,i)=><TradeCard key={i}trade={t}onDelete={()=>{if(window.confirm('Remover?'))setTrades(p=>p.filter(x=>x!==t));}}/>)}
-      </div>}
-      {tab==='stats'&&<Stats trades={trades}/>}
-      {tab==='backtest'&&<Backtest cases={bt}onSave={c=>setBt(p=>[...p,c])}onDelete={i=>setBt(p=>p.filter((_,j)=>j!==i))}/>}
-      {tab==='chat'&&<div style={{background:'#0d1526',borderRadius:14,padding:20,border:'1px solid #1e3a5f'}}><div style={{color:'#6366f1',fontSize:11,fontWeight:700,letterSpacing:0.8,marginBottom:14}}>💬 ZELLA — SUA IA DE TRADING</div><Chat trades={trades}/></div>}
-    </div>
-  </div>;
+    </div>`;
+  }
+
+  html+=`</div>`;
+  app.innerHTML=html;
+  if(state.tab==='chat'){const cm=document.getElementById('chat-msgs');if(cm)cm.scrollTop=cm.scrollHeight;}
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+// ── ACTIONS ────────────────────────────────────────────────────────
+function setTab(t){state.tab=t;render();}
+function showForm(){state.showForm=true;state.formMode='texto';state.formTxt='';state.formErr='';render();}
+function hideForm(){state.showForm=false;render();}
+function setFormMode(m){state.formMode=m;render();}
+function setFormTxt(v){state.formTxt=v;}
+function setFD(k,v){state.formData[k]=v;render();}
+function toggleFD(k){
+  if(k==='lt_rompimento_forte')state.formData[k]=state.formData[k]===true?false:true;
+  else state.formData[k]=!state.formData[k];
+  render();
+}
+function setFilter(k,v){state.filter[k]=v;render();}
+function clearFilter(){state.filter={setup:'',resultado:'',days:''};render();}
+function toggleTrade(i){state.openTrades[i]=!state.openTrades[i];render();}
+function deleteTrade(i){if(confirm('Remover esse trade?')){state.trades.splice(i,1);save();render();}}
+
+async function parseForm(){
+  if(!state.formTxt.trim())return;
+  state.formLoading=true;state.formErr='';render();
+  try{
+    const t=await callClaude(PARSE_PROMPT,state.formTxt);
+    const p=parseJ(t);
+    if(!p.data)p.data=today();
+    if(!p.pnl&&p.resultado==='Loss')p.pnl=-1;
+    if(!p.pnl&&p.resultado==='Win')p.pnl=p.rr_realizado||1;
+    state.formData={par:'',setup:'',direcao:'',resultado:'',pnl:'',rr_realizado:'',fibo_nivel:'',timeframe:'',sessao:'',emocao:'',seguiu_regras:true,moveu_be_cedo:false,tinha_confluencia:true,lt_rompimento_forte:null,erros:'',acertos:'',data:today(),notas:'',resumo_ia:'',score:null,...p};
+    state.formMode='manual';
+  }catch{state.formErr='Não consegui interpretar. Tente descrever com mais detalhes.';}
+  state.formLoading=false;render();
+}
+
+function saveTrade(){
+  const f=state.formData;
+  if(!f.par||!f.setup||!f.resultado){state.formErr='Preencha: par, setup e resultado.';render();return;}
+  state.trades.unshift({...f,pnl:Number(f.pnl)||0,rr_realizado:Number(f.rr_realizado)||null});
+  state.showForm=false;
+  state.formData={par:'',setup:'',direcao:'',resultado:'',pnl:'',rr_realizado:'',fibo_nivel:'',timeframe:'',sessao:'',emocao:'',seguiu_regras:true,moveu_be_cedo:false,tinha_confluencia:true,lt_rompimento_forte:null,erros:'',acertos:'',data:today(),notas:'',resumo_ia:'',score:null};
+  save();render();
+}
+
+function exportJ(){
+  const b=new Blob([JSON.stringify({trades:state.trades,bt:state.bt},null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`diario-${today().replace(/\//g,'-')}.json`;a.click();
+}
+function importJ(e){
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.trades)state.trades=d.trades;if(d.bt)state.bt=d.bt;save();render();}catch{alert('Arquivo inválido.');}};r.readAsText(f);
+}
+
+async function sendChat(msg){
+  const t=msg||state.chatInput.trim();if(!t||state.chatLoading)return;
+  state.chatInput='';
+  const ctx=state.trades.length?`TRADES(${state.trades.length}):\n${JSON.stringify(state.trades.slice(0,30),null,1)}\nSTATS:\n${JSON.stringify(calcStats(state.trades),null,1)}`:'Nenhum trade ainda.';
+  state.chatMsgs.push({role:'user',content:t});
+  state.chatLoading=true;render();
+  try{
+    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,system:CHAT_SYS+'\n\nCONTEXTO:\n'+ctx,messages:state.chatMsgs.map(m=>({role:m.role,content:m.content}))})});
+    const d=await r.json();
+    state.chatMsgs.push({role:'assistant',content:d.content?.map(i=>i.text||'').join('')||'Erro.'});
+  }catch{state.chatMsgs.push({role:'assistant',content:'Erro de conexão.'});}
+  state.chatLoading=false;render();
+}
+
+function setBtAdding(v){state.btAdding=v;if(!v)state.btForm={id:Date.now(),data:today(),par:'',nivel:'',tf:'',confluencias:[],tinha_lt_choch:false,retestou:false,tipo_retest:'',mm_proxima:false,mm_respeitou:'',candles_ate_alvo:'',lt_forca:'',ate_onde_foi:'',saiu_antes:false,motivo_saiu:'',contexto:'',notas:''};render();}
+function setBtF(k,v){state.btForm[k]=v;render();}
+function toggleBtF(k){state.btForm[k]=!state.btForm[k];render();}
+function toggleConf(o){const c=state.btForm.confluencias;state.btForm.confluencias=c.includes(o)?c.filter(x=>x!==o):[...c,o];render();}
+function saveBt(){if(!state.btForm.par||!state.btForm.nivel)return;state.bt.push({...state.btForm,id:Date.now()});setBtAdding(false);save();}
+function deleteBt(i){if(confirm('Remover caso?')){state.bt.splice(i,1);save();render();}}
+
+render();
 </script>
 </body>
 </html>
