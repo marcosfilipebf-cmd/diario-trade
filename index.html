@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Diário Zella</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.8.0/Recharts.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#060d1f;color:#f1f5f9;font-family:system-ui,-apple-system,sans-serif}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:#0d1526}
+::-webkit-scrollbar-thumb{background:#1e3a5f;border-radius:4px}
+input::placeholder,textarea::placeholder{color:#334155}
+@keyframes spin{to{transform:rotate(360deg)}}
+select option{background:#0d1526;color:#f1f5f9}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef}=React;
+const {LineChart,Line,BarChart,Bar,XAxis,YAxis,Tooltip,ResponsiveContainer,Cell}=Recharts;
+
+// ── CONSTANTS ──────────────────────────────────────────────────────
+const CAPITAL=200,MAX_DAILY_LOSS=6,MAX_CONSEC=3;
+const ALL_PAIRS=['US30','EURUSD','GBPUSD','BTC','US500','USOIL','XAGUSD','GBPJPY','NASDAQ','XAUUSD','AUDUSD'];
+const PAUSED=['AUDUSD','XAUUSD'];
+const SETUPS=['Pivot','Fibo'];
+const FIBO_LEVELS=['50','61.8','73.6'];
+const TIMEFRAMES=['M2','M5'];
+const SESSIONS=['Manhã','Tarde','Noite','Madrugada'];
+const EMOTIONS=['Neutro','Confiante','Ansioso','Com medo','Empolgado','Frustrado','Impaciente','Calmo'];
+const RESULTS=['Win','Loss','BE'];
+const FIBO_CONF=['MM20','MM50','LT','PB LT','CHoCH'];
+const RETEST_TYPES=['Acima do nível','Tocou','Quebrou e voltou','Invalidou'];
+const LT_STRENGTH=['Forte','Fraco'];
+const CONTEXTS=['Tendência','Lateral','Pós-notícia'];
+const TARGETS=['0.382','0 (alvo)','Rompeu','Saiu antes'];
+const RC={Win:'#22c55e',Loss:'#ef4444',BE:'#f59e0b'};
+const EC={Neutro:'#64748b',Confiante:'#22c55e',Ansioso:'#f59e0b','Com medo':'#ef4444',Empolgado:'#6366f1',Frustrado:'#ef4444',Impaciente:'#f59e0b',Calmo:'#22c55e'};
+
+const PARSE_PROMPT=`Você é especialista em trades de Forex/Futuros/Cripto. Setups: Pivot (RR 1:1) e Fibo (RR mín 3.5). Capital $200, risco $1/trade, perda máx diária $6. Corretora Exness Zero Spread, plataforma TradingView, TFs M2/M5.
+Extraia o trade descrito e retorne SOMENTE JSON válido sem markdown:
+{"par":"EURUSD","setup":"Pivot ou Fibo","direcao":"Compra ou Venda","resultado":"Win/Loss/BE","pnl":number,"rr_realizado":number,"fibo_nivel":"50/61.8/73.6 ou null","timeframe":"M2/M5","sessao":"Manhã/Tarde/Noite/Madrugada","emocao":"Neutro/Confiante/Ansioso/Com medo/Empolgado/Frustrado/Impaciente/Calmo","seguiu_regras":true,"moveu_be_cedo":false,"tinha_confluencia":true,"lt_rompimento_forte":true,"erros":"string ou null","acertos":"string ou null","data":"DD/MM/YYYY","notas":"string ou null","resumo_ia":"2-3 frases analisando com dica de melhoria","score":8}`;
+
+const CHAT_SYS=`Você é a Zella, assistente de trading especializada. PERFIL: Capital $200, risco $1 (0,5%), perda máx $6/dia, Exness Zero Spread, TradingView, M2/M5. Setups: Pivot (RR 1:1) e Fibo (RR mín 3.5). Regra: 3 losses consecutivos ou -$6 = encerra e vai fazer exercício ou tocar violão. Pares Pivot: US30,EURUSD,GBPUSD,BTC,US500,USOIL,XAGUSD. Fibo: todos exceto AUDUSD e XAUUSD. Pausados: AUDUSD e XAUUSD. Aprendizados: BE precoce foi o maior destruidor em agosto; US30 melhor par no Pivot (62% WR); quintas são o melhor dia; quartas têm cuidado redobrado. Responda em português, direto e prático.`;
+
+// ── HELPERS ────────────────────────────────────────────────────────
+function today(){return new Date().toLocaleDateString('pt-BR');}
+function weekday(s){if(!s)return'';const[d,m,y]=s.split('/');return['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][new Date(`${y}-${m}-${d}`).getDay()]||'';}
+function fmt(n){if(n===null||n===undefined||n==='')return'—';const x=Number(n);return`${x>=0?'':'-'}$${Math.abs(x).toFixed(2)}`;}
+function calcStats(trades){
+  if(!trades.length)return null;
+  const wins=trades.filter(t=>t.resultado==='Win');
+  const losses=trades.filter(t=>t.resultado==='Loss');
+  const totalPnl=trades.reduce((s,t)=>s+(t.pnl||0),0);
+  const gw=wins.reduce((s,t)=>s+(t.pnl||0),0);
+  const gl=Math.abs(losses.reduce((s,t)=>s+(t.pnl||0),0));
+  const pf=gl>0?(gw/gl).toFixed(2):wins.length>0?'∞':'—';
+  const rrs=trades.filter(t=>t.rr_realizado);
+  const avgRR=rrs.length?(rrs.reduce((s,t)=>s+t.rr_realizado,0)/rrs.length).toFixed(2):'—';
+  return{totalPnl,wins:wins.length,losses:losses.length,winRate:Math.round((wins.length/trades.length)*100),pf,avgRR};
+}
+function getDailyPnl(trades){return trades.filter(t=>t.data===today()).reduce((s,t)=>s+(t.pnl||0),0);}
+function getConsecLosses(trades){
+  let c=0;
+  for(const t of trades.filter(t=>t.data===today())){if(t.resultado==='Loss')c++;else break;}
+  return c;
+}
+async function callClaude(system,msg){
+  const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,system,messages:[{role:'user',content:msg}]})});
+  const d=await r.json();
+  return d.content?.map(i=>i.text||'').join('')||'';
+}
+function parseJ(t){return JSON.parse(t.replace(/```json|```/g,'').trim());}
+
+// ── UI COMPONENTS ──────────────────────────────────────────────────
+function Badge({children,color='#334155'}){return <span style={{background:color+'22',color,border:`1px solid ${color}44`,padding:'2px 8px',borderRadius:20,fontSize:11,fontWeight:600,whiteSpace:'nowrap'}}>{children}</span>;}
+function Spinner(){return <span style={{display:'inline-block',width:13,height:13,border:'2px solid #334155',borderTop:'2px solid #6366f1',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/>;}
+function ScoreRing({score}){const color=score>=8?'#22c55e':score>=5?'#f59e0b':'#ef4444';const r=20,c=2*Math.PI*r;return<div style={{position:'relative',width:50,height:50,flexShrink:0}}><svg width={50}height={50}style={{transform:'rotate(-90deg)'}}><circle cx={25}cy={25}r={r}fill="none"stroke="#1e3a5f"strokeWidth={4}/><circle cx={25}cy={25}r={r}fill="none"stroke={color}strokeWidth={4}strokeDasharray={`${(score/10)*c} ${c}`}strokeLinecap="round"/></svg><div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',color,fontWeight:800,fontSize:13}}>{score}</div></div>;}
+function Sel({value,onChange,options,placeholder}){return<select value={value}onChange={e=>onChange(e.target.value)}style={{background:'#060d1f',border:'1px solid #1e3a5f',borderRadius:8,color:value?'#f1f5f9':'#475569',fontSize:13,padding:'8px 10px',outline:'none',width:'100%'}}>{placeholder&&<option value="">{placeholder}</option>}{options.map(o=><option key={o}value={o}>{o}</option>)}</select>;}
+function Inp({value,onChange,placeholder,type='text'}){return<input type={type}value={value}onChange={e=>onChange(e.target.value)}placeholder={placeholder}style={{background:'#060d1f',border:'1px solid #1e3a5f',borderRadius:8,color:'#f1f5f9',fontSize:13,padding:'8px 10px',outline:'none',width:'100%',fontFamily:'inherit'}}/>;}
+function Tog({value,onChange,label}){return<label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer'}}><div onClick={()=>onChange(!value)}style={{width:36,height:20,borderRadius:10,background:value?'#6366f1':'#1e3a5f',position:'relative',transition:'background 0.2s',flexShrink:0}}><div style={{width:14,height:14,borderRadius:'50%',background:'#fff',position:'absolute',top:3,left:value?18:3,transition:'left 0.2s'}}/></div>{label&&<span style={{color:'#94a3b8',fontSize:13}}>{label}</span>}</label>;}
+function PBtn({children,onClick,disabled,loading}){return<button onClick={onClick}disabled={disabled||loading}style={{background:disabled||loading?'#1e3a5f':'linear-gradient(135deg,#6366f1,#8b5cf6)',border:'none',borderRadius:8,color:'#fff',padding:'10px 20px',fontSize:13,fontWeight:700,cursor:disabled||loading?'not-allowed':'pointer',display:'flex',alignItems:'center',gap:8,opacity:disabled?0.5:1}}>{children}</button>;}
+function GBtn({children,onClick}){return<button onClick={onClick}style={{background:'none',border:'1px solid #1e3a5f',borderRadius:8,color:'#64748b',padding:'8px 14px',cursor:'pointer',fontSize:12}}>{children}</button>;}
+function Card({children,style={}}){return<div style={{background:'#0d1526',borderRadius:12,border:'1px solid #1e3a5f',padding:16,...style}}>{children}</div>;}
+function SLabel({children,color='#6366f1'}){return<div style={{color,fontSize:10,fontWeight:700,letterSpacing:0.8,marginBottom:10}}>{children}</div>;}
+function Met({label,value,color='#f1f5f9',sub}){return<div style={{background:'#0d1526',borderRadius:10,padding:'12px 14px',border:'1px solid #1e3a5f'}}><div style={{color:'#475569',fontSize:10,fontWeight:600,marginBottom:3}}>{label}</div><div style={{color,fontWeight:700,fontSize:18}}>{value}</div>{sub&&<div style={{color:'#475569',fontSize:11,marginTop:2}}>{sub}</div>}</div>;}
+
+// ── TRADE CARD ─────────────────────────────────────────────────────
+function TradeCard({trade,onDelete}){
+  const[open,setOpen]=useState(false);
+  const rc=RC[trade.resultado]||'#64748b';
+  const ec=EC[trade.emocao]||'#64748b';
+  return<div style={{background:'#0b1220',borderRadius:12,marginBottom:8,border:`1px solid ${trade.resultado==='Win'?'#22c55e33':trade.resultado==='Loss'?'#ef444433':'#1e3a5f'}`,overflow:'hidden'}}>
+    <div onClick={()=>setOpen(!open)}style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 16px',cursor:'pointer',gap:8,flexWrap:'wrap'}}>
+      <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+        <Badge color={rc}>{trade.resultado}</Badge>
+        <span style={{fontWeight:700,color:'#f1f5f9',fontSize:14}}>{trade.par}</span>
+        <Badge color='#334155'>{trade.setup}</Badge>
+        {trade.fibo_nivel&&<Badge color='#6366f1'>Fibo {trade.fibo_nivel}</Badge>}
+        {trade.direcao&&<Badge color={trade.direcao==='Compra'?'#22c55e':'#ef4444'}>{trade.direcao}</Badge>}
+        <span style={{color:'#475569',fontSize:11}}>{trade.data}{weekday(trade.data)?` · ${weekday(trade.data)}`:''}</span>
+        {trade.sessao&&<span style={{color:'#475569',fontSize:11}}>· {trade.sessao}</span>}
+        {trade.emocao&&<span style={{color:ec,fontSize:11,fontWeight:600}}>● {trade.emocao}</span>}
+        {trade.moveu_be_cedo&&<Badge color='#f59e0b'>BE precoce ⚠</Badge>}
+        {!trade.seguiu_regras&&<Badge color='#ef4444'>Fora do plano</Badge>}
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:10}}>
+        <span style={{color:rc,fontWeight:700,fontSize:15}}>{fmt(trade.pnl)}</span>
+        {trade.rr_realizado&&<span style={{color:'#64748b',fontSize:11}}>R:{trade.rr_realizado}</span>}
+        {trade.score&&<ScoreRing score={trade.score}/>}
+        <button onClick={e=>{e.stopPropagation();onDelete();}}style={{background:'none',border:'none',color:'#334155',cursor:'pointer',fontSize:18,padding:0}}>×</button>
+      </div>
+    </div>
+    {open&&<div style={{padding:'12px 16px',borderTop:'1px solid #1e3a5f',display:'grid',gap:10}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
+        {[['TF',trade.timeframe||'—'],['RR',trade.rr_realizado?`1:${trade.rr_realizado}`:'—'],['Confluência',trade.tinha_confluencia==null?'—':trade.tinha_confluencia?'Sim ✓':'Não ✗'],['LT Forte',trade.lt_rompimento_forte==null?'—':trade.lt_rompimento_forte?'Sim ✓':'Não ✗']].map(([l,v])=><div key={l}style={{background:'#060d1f',borderRadius:8,padding:'8px 10px'}}><div style={{color:'#475569',fontSize:10,marginBottom:2}}>{l}</div><div style={{color:'#f1f5f9',fontSize:12,fontWeight:600}}>{v}</div></div>)}
+      </div>
+      {(trade.acertos||trade.erros)&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+        {trade.acertos&&<div style={{background:'#052e16',borderRadius:8,padding:'10px 12px',border:'1px solid #22c55e33'}}><div style={{color:'#22c55e',fontSize:10,fontWeight:700,marginBottom:4}}>✓ ACERTOS</div><div style={{color:'#bbf7d0',fontSize:12}}>{trade.acertos}</div></div>}
+        {trade.erros&&<div style={{background:'#1c0606',borderRadius:8,padding:'10px 12px',border:'1px solid #ef444433'}}><div style={{color:'#ef4444',fontSize:10,fontWeight:700,marginBottom:4}}>✗ ERROS</div><div style={{color:'#fca5a5',fontSize:12}}>{trade.erros}</div></div>}
+      </div>}
+      {trade.resumo_ia&&<div style={{background:'#060d1f',borderRadius:8,padding:'10px 12px',border:'1px solid #6366f133'}}><div style={{color:'#6366f1',fontSize:10,fontWeight:700,marginBottom:4}}>⚡ ANÁLISE IA</div><div style={{color:'#cbd5e1',fontSize:12,lineHeight:1.6}}>{trade.resumo_ia}</div></div>}
+    </div>}
+  </div>;
+}
+
+// ── TRADE FORM ─────────────────────────────────────────────────────
+function TradeForm({onSave,onCancel}){
+  const ef=()=>({par:'',setup:'',direcao:'',resultado:'',pnl:'',rr_realizado:'',fibo_nivel:'',timeframe:'',sessao:'',emocao:'',seguiu_regras:true,moveu_be_cedo:false,tinha_confluencia:true,lt_rompimento_forte:null,erros:'',acertos:'',data:today(),notas:'',resumo_ia:'',score:null});
+  const[mode,setMode]=useState('texto');
+  const[txt,setTxt]=useState('');
+  const[form,setForm]=useState(ef());
+  const[loading,setLoading]=useState(false);
+  const[err,setErr]=useState('');
+  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+
+  async function parse(){
+    if(!txt.trim())return;
+    setLoading(true);setErr('');
+    try{
+      const t=await callClaude(PARSE_PROMPT,txt);
+      const p=parseJ(t);
+      if(!p.data)p.data=today();
+      if(!p.pnl&&p.resultado==='Loss')p.pnl=-1;
+      if(!p.pnl&&p.resultado==='Win')p.pnl=p.rr_realizado||1;
+      setForm({...ef(),...p});setMode('manual');
+    }catch{setErr('Não consegui interpretar. Tente descrever com mais detalhes.');}
+    finally{setLoading(false);}
+  }
+
+  function save(){
+    if(!form.par||!form.setup||!form.resultado){setErr('Preencha: par, setup e resultado.');return;}
+    onSave({...form,pnl:Number(form.pnl)||0,rr_realizado:Number(form.rr_realizado)||null});
+  }
+
+  return<div style={{background:'#0d1526',borderRadius:14,padding:20,border:'1px solid #1e3a5f',marginBottom:16}}>
+    <div style={{display:'flex',gap:8,marginBottom:16}}>
+      {['texto','manual'].map(m=><button key={m}onClick={()=>setMode(m)}style={{background:mode===m?'#6366f1':'transparent',border:'1px solid '+(mode===m?'#6366f1':'#1e3a5f'),borderRadius:8,color:mode===m?'#fff':'#64748b',padding:'7px 16px',cursor:'pointer',fontSize:12,fontWeight:600}}>{m==='texto'?'✍️ Descrever':'📋 Preencher'}</button>)}
+    </div>
+    {mode==='texto'&&<div>
+      <textarea value={txt}onChange={e=>setTxt(e.target.value)}onKeyDown={e=>e.ctrlKey&&e.key==='Enter'&&parse()}placeholder={"Descreva o trade:\n\"Pivot compra EURUSD M5, win, confiante, segui o setup\"\n\"Fibo 61.8 US30, venda, loss $1, movi BE cedo demais\""}style={{width:'100%',minHeight:100,background:'#060d1f',border:'1px solid #1e3a5f',borderRadius:8,color:'#f1f5f9',fontSize:13,padding:12,resize:'vertical',fontFamily:'inherit',outline:'none',lineHeight:1.6}}/>
+      {err&&<div style={{color:'#ef4444',fontSize:12,marginTop:6}}>⚠ {err}</div>}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:12}}>
+        <span style={{color:'#334155',fontSize:11}}>Ctrl+Enter para analisar</span>
+        <div style={{display:'flex',gap:8}}><GBtn onClick={onCancel}>Cancelar</GBtn><PBtn onClick={parse}loading={loading}disabled={!txt.trim()}>{loading?<><Spinner/> Analisando...</>:'⚡ Analisar com IA'}</PBtn></div>
+      </div>
+    </div>}
+    {mode==='manual'&&<div style={{display:'grid',gap:12}}>
+      {PAUSED.includes(form.par)&&<div style={{background:'#2d1800',border:'1px solid #f59e0b44',borderRadius:8,padding:'10px 12px'}}><span style={{color:'#f59e0b',fontSize:12}}>⚠ {form.par} está pausado</span></div>}
+      {form.resumo_ia&&<div style={{background:'#060d1f',borderRadius:8,padding:'12px 14px',border:'1px solid #6366f155'}}><div style={{color:'#6366f1',fontSize:10,fontWeight:700,marginBottom:6}}>⚡ ANÁLISE IA</div><div style={{color:'#cbd5e1',fontSize:13,lineHeight:1.6}}>{form.resumo_ia}</div>{form.score&&<div style={{color:'#94a3b8',fontSize:11,marginTop:6}}>Score: {form.score}/10</div>}</div>}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
+        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>PAR *</label><Sel value={form.par}onChange={v=>set('par',v)}options={ALL_PAIRS}placeholder="Selecione"/></div>
+        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>SETUP *</label><Sel value={form.setup}onChange={v=>set('setup',v)}options={SETUPS}placeholder="Selecione"/></div>
+        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>RESULTADO *</label><Sel value={form.resultado}onChange={v=>set('resultado',v)}options={RESULTS}placeholder="Selecione"/></div>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:10}}>
+        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>DIREÇÃO</label><Sel value={form.direcao}onChange={v=>set('direcao',v)}options={['Compra','Venda']}placeholder="—"/></div>
+        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>P&L ($)</label><Inp value={form.pnl}onChange={v=>set('pnl',v)}placeholder="-1.00"type="number"/></div>
+        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>RR</label><Inp value={form.rr_realizado}onChange={v=>set('rr_realizado',v)}placeholder="1.0"type="number"/></div>
+        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>DATA</label><Inp value={form.data}onChange={v=>set('data',v)}placeholder="DD/MM/YYYY"/></div>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
+        {form.setup==='Fibo'&&<div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>NÍVEL FIBO</label><Sel value={form.fibo_nivel}onChange={v=>set('fibo_nivel',v)}options={FIBO_LEVELS}placeholder="—"/></div>}
+        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>TIMEFRAME</label><Sel value={form.timeframe}onChange={v=>set('timeframe',v)}options={TIMEFRAMES}placeholder="—"/></div>
+        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>SESSÃO</label><Sel value={form.sessao}onChange={v=>set('sessao',v)}options={SESSIONS}placeholder="—"/></div>
+        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>EMOÇÃO</label><Sel value={form.emocao}onChange={v=>set('emocao',v)}options={EMOTIONS}placeholder="—"/></div>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,padding:'10px 0'}}>
+        <Tog value={form.seguiu_regras}onChange={v=>set('seguiu_regras',v)}label="Seguiu as regras"/>
+        <Tog value={form.tinha_confluencia}onChange={v=>set('tinha_confluencia',v)}label="Tinha confluência"/>
+        {form.setup==='Fibo'&&<Tog value={form.moveu_be_cedo}onChange={v=>set('moveu_be_cedo',v)}label="Moveu BE cedo"/>}
+        {form.setup==='Fibo'&&<Tog value={form.lt_rompimento_forte===true}onChange={v=>set('lt_rompimento_forte',v)}label="LT forte"/>}
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>ACERTOS</label><textarea value={form.acertos}onChange={e=>set('acertos',e.target.value)}style={{width:'100%',minHeight:60,background:'#060d1f',border:'1px solid #1e3a5f',borderRadius:8,color:'#f1f5f9',fontSize:12,padding:8,resize:'vertical',fontFamily:'inherit',outline:'none'}}/></div>
+        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>ERROS</label><textarea value={form.erros}onChange={e=>set('erros',e.target.value)}style={{width:'100%',minHeight:60,background:'#060d1f',border:'1px solid #1e3a5f',borderRadius:8,color:'#f1f5f9',fontSize:12,padding:8,resize:'vertical',fontFamily:'inherit',outline:'none'}}/></div>
+      </div>
+      {err&&<div style={{color:'#ef4444',fontSize:12}}>⚠ {err}</div>}
+      <div style={{display:'flex',justifyContent:'flex-end',gap:8}}><GBtn onClick={()=>setMode('texto')}>← Voltar</GBtn><GBtn onClick={onCancel}>Cancelar</GBtn><PBtn onClick={save}>💾 Salvar Trade</PBtn></div>
+    </div>}
+  </div>;
+}
+
+// ── STATS ──────────────────────────────────────────────────────────
+function Stats({trades}){
+  if(!trades.length)return<div style={{textAlign:'center',padding:48,color:'#334155'}}><div style={{fontSize:36,marginBottom:10}}>📊</div>Registre trades para ver as estatísticas</div>;
+  const s=calcStats(trades);
+  let run=0;
+  const equity=[...trades].reverse().map((t,i)=>{run+=(t.pnl||0);return{i:i+1,pnl:parseFloat(run.toFixed(2))};});
+  const dg={};
+  trades.forEach(t=>{const[d,m,y]=(t.data||'').split('/');if(!d)return;const day=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][new Date(`${y}-${m}-${d}`).getDay()]||'?';if(!dg[day])dg[day]={wins:0,losses:0,pnl:0};if(t.resultado==='Win')dg[day].wins++;if(t.resultado==='Loss')dg[day].losses++;dg[day].pnl+=(t.pnl||0);});
+  const dd=['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'].filter(d=>dg[d]).map(d=>({day:d,...dg[d],pnl:parseFloat(dg[d].pnl.toFixed(2))}));
+  function gs(arr,key){const g={};arr.forEach(t=>{const k=t[key]||'—';if(!g[k])g[k]=[];g[k].push(t);});return Object.entries(g).map(([label,ts])=>{const w=ts.filter(t=>t.resultado==='Win').length;const l=ts.filter(t=>t.resultado==='Loss').length;const p=ts.reduce((s,t)=>s+(t.pnl||0),0);return{label,w,l,p,wr:ts.length?Math.round((w/ts.length)*100):0};}).sort((a,b)=>b.p-a.p);}
+  const bePnl=trades.filter(t=>t.moveu_be_cedo&&t.resultado==='Loss').length;
+  const noRule=trades.filter(t=>!t.seguiu_regras).length;
+  const weakLT=trades.filter(t=>t.lt_rompimento_forte===false&&t.resultado==='Loss').length;
+  const TRow=({label,w,l,p,wr})=><div style={{display:'grid',gridTemplateColumns:'1fr 40px 40px 60px 50px',gap:8,alignItems:'center',padding:'9px 0',borderBottom:'1px solid #1e3a5f'}}><span style={{color:'#f1f5f9',fontSize:13}}>{label}</span><span style={{color:'#22c55e',fontSize:12,textAlign:'center'}}>{w}W</span><span style={{color:'#ef4444',fontSize:12,textAlign:'center'}}>{l}L</span><span style={{color:p>=0?'#22c55e':'#ef4444',fontSize:12,fontWeight:700}}>{fmt(p)}</span><span style={{color:wr>=50?'#22c55e':'#f59e0b',fontSize:12}}>{wr}%</span></div>;
+  return<div style={{display:'grid',gap:14}}>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
+      <Met label="P&L TOTAL"value={fmt(s.totalPnl)}color={s.totalPnl>=0?'#22c55e':'#ef4444'}/>
+      <Met label="WIN RATE"value={`${s.winRate}%`}color={s.winRate>=50?'#22c55e':'#ef4444'}sub={`${s.wins}W · ${s.losses}L`}/>
+      <Met label="PROFIT FACTOR"value={s.pf}color={parseFloat(s.pf)>=1.5?'#22c55e':'#f59e0b'}/>
+      <Met label="RR MÉDIO"value={`1:${s.avgRR}`}color="#f1f5f9"/>
+      <Met label="TRADES"value={trades.length}color="#f1f5f9"/>
+      <Met label="SCORE MÉDIO"value={`${(trades.reduce((a,t)=>a+(t.score||5),0)/trades.length).toFixed(1)}/10`}color="#6366f1"/>
+    </div>
+    <Card><SLabel>📈 CURVA DE EQUITY</SLabel><ResponsiveContainer width="100%"height={160}><LineChart data={equity}><XAxis dataKey="i"tick={{fill:'#475569',fontSize:10}}/><YAxis tick={{fill:'#475569',fontSize:10}}tickFormatter={v=>`$${v}`}/><Tooltip formatter={v=>[`$${v}`,'P&L']}contentStyle={{background:'#0d1526',border:'1px solid #1e3a5f',borderRadius:8}}/><Line type="monotone"dataKey="pnl"stroke="#6366f1"strokeWidth={2}dot={false}/></LineChart></ResponsiveContainer></Card>
+    {dd.length>0&&<Card><SLabel>📅 POR DIA DA SEMANA</SLabel><ResponsiveContainer width="100%"height={130}><BarChart data={dd}><XAxis dataKey="day"tick={{fill:'#475569',fontSize:11}}/><YAxis tick={{fill:'#475569',fontSize:10}}tickFormatter={v=>`$${v}`}/><Tooltip formatter={v=>[`$${v}`,'P&L']}contentStyle={{background:'#0d1526',border:'1px solid #1e3a5f',borderRadius:8}}/><Bar dataKey="pnl"radius={[4,4,0,0]}>{dd.map((d,i)=><Cell key={i}fill={d.day==='Qua'?'#f59e0b':d.pnl>=0?'#22c55e':'#ef4444'}/>)}</Bar></BarChart></ResponsiveContainer><div style={{color:'#475569',fontSize:10,marginTop:6}}>⚠ Quarta-feira destacada</div></Card>}
+    <Card><SLabel>💱 POR PAR</SLabel><div style={{display:'grid',gridTemplateColumns:'1fr 40px 40px 60px 50px',gap:8,marginBottom:6}}>{['Par','W','L','P&L','WR'].map(h=><span key={h}style={{color:'#475569',fontSize:10,fontWeight:700}}>{h}</span>)}</div>{gs(trades,'par').map(r=><TRow key={r.label}{...r}/>)}</Card>
+    <Card><SLabel>📐 POR SETUP</SLabel><div style={{display:'grid',gridTemplateColumns:'1fr 40px 40px 60px 50px',gap:8,marginBottom:6}}>{['Setup','W','L','P&L','WR'].map(h=><span key={h}style={{color:'#475569',fontSize:10,fontWeight:700}}>{h}</span>)}</div>{gs(trades,'setup').map(r=><TRow key={r.label}{...r}/>)}</Card>
+    {gs(trades.filter(t=>t.setup==='Fibo'),'fibo_nivel').length>0&&<Card><SLabel>🎯 FIBO POR NÍVEL</SLabel><div style={{display:'grid',gridTemplateColumns:'1fr 40px 40px 60px 50px',gap:8,marginBottom:6}}>{['Nível','W','L','P&L','WR'].map(h=><span key={h}style={{color:'#475569',fontSize:10,fontWeight:700}}>{h}</span>)}</div>{gs(trades.filter(t=>t.setup==='Fibo'),'fibo_nivel').map(r=><TRow key={r.label}label={`Fibo ${r.label}`}{...r}/>)}</Card>}
+    <Card><SLabel>🧠 POR EMOÇÃO</SLabel><div style={{display:'grid',gridTemplateColumns:'1fr 40px 40px 60px 50px',gap:8,marginBottom:6}}>{['Emoção','W','L','P&L','WR'].map(h=><span key={h}style={{color:'#475569',fontSize:10,fontWeight:700}}>{h}</span>)}</div>{gs(trades,'emocao').map(r=><TRow key={r.label}{...r}/>)}</Card>
+    <Card><SLabel color="#f59e0b">⚠ ALERTAS DE DISCIPLINA</SLabel>{[['BE precoce → Loss',bePnl,'BE cedo resultou em loss'],['Fora das regras',noRule,'Trades fora do plano'],['LT fraca → Loss (Fibo)',weakLT,'Sem rompimento de LT forte']].map(([l,v,d])=><div key={l}style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid #1e3a5f'}}><div><div style={{color:'#f1f5f9',fontSize:13}}>{l}</div><div style={{color:'#475569',fontSize:11}}>{d}</div></div><div style={{color:v>0?'#ef4444':'#22c55e',fontWeight:700,fontSize:18}}>{v}</div></div>)}</Card>
+  </div>;
+}
+
+// ── CHAT ───────────────────────────────────────────────────────────
+function Chat({trades}){
+  const[msgs,setMsgs]=useState([{role:'assistant',content:`Olá! Sou a Zella. Tenho acesso aos seus ${trades.length} trades. Pergunta qualquer coisa sobre sua performance! 📊`}]);
+  const[input,setInput]=useState('');
+  const[loading,setLoading]=useState(false);
+  const bottom=useRef(null);
+  useEffect(()=>bottom.current?.scrollIntoView({behavior:'smooth'}),[msgs]);
+  const SUGG=['Qual meu melhor par?','Estou errando no Fibo?','Como foi minha disciplina?','Qual emoção me faz perder?'];
+  async function send(msg){
+    const t=msg||input.trim();if(!t||loading)return;setInput('');
+    const ctx=trades.length?`TRADES(${trades.length}):\n${JSON.stringify(trades.slice(0,50),null,1)}\nSTATS:\n${JSON.stringify(calcStats(trades),null,1)}`:'Nenhum trade ainda.';
+    const nm=[...msgs,{role:'user',content:t}];setMsgs(nm);setLoading(true);
+    try{
+      const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,system:CHAT_SYS+'\n\nCONTEXTO:\n'+ctx,messages:nm.map(m=>({role:m.role,content:m.content}))})});
+      const d=await r.json();
+      setMsgs([...nm,{role:'assistant',content:d.content?.map(i=>i.text||'').join('')||'Erro.'}]);
+    }catch{setMsgs([...nm,{role:'assistant',content:'Erro de conexão.'}]);}
+    finally{setLoading(false);}
+  }
+  return<div style={{display:'flex',flexDirection:'column',height:500}}>
+    <div style={{flex:1,overflowY:'auto',display:'flex',flexDirection:'column',gap:10,marginBottom:12}}>
+      {msgs.map((m,i)=><div key={i}style={{maxWidth:'85%',alignSelf:m.role==='user'?'flex-end':'flex-start',background:m.role==='user'?'#1e3a5f':'#111827',border:`1px solid ${m.role==='user'?'#2d5a8f':'#1e3a5f'}`,borderRadius:12,padding:'10px 14px',color:'#e2e8f0',fontSize:13,lineHeight:1.7,whiteSpace:'pre-wrap'}}>{m.content}</div>)}
+      {loading&&<div style={{alignSelf:'flex-start',background:'#111827',border:'1px solid #1e3a5f',borderRadius:12,padding:'10px 14px'}}><Spinner/></div>}
+      <div ref={bottom}/>
+    </div>
+    {msgs.length<=2&&<div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:10}}>{SUGG.map(s=><button key={s}onClick={()=>send(s)}style={{background:'#0d1526',border:'1px solid #1e3a5f',borderRadius:20,color:'#94a3b8',padding:'5px 12px',cursor:'pointer',fontSize:11}}>{s}</button>)}</div>}
+    <div style={{display:'flex',gap:8}}>
+      <input value={input}onChange={e=>setInput(e.target.value)}onKeyDown={e=>e.key==='Enter'&&send()}placeholder="Pergunte sobre sua performance..."style={{flex:1,background:'#060d1f',border:'1px solid #1e3a5f',borderRadius:8,color:'#f1f5f9',fontSize:13,padding:'10px 14px',outline:'none',fontFamily:'inherit'}}/>
+      <button onClick={()=>send()}disabled={loading||!input.trim()}style={{background:'linear-gradient(135deg,#6366f1,#8b5cf6)',border:'none',borderRadius:8,color:'#fff',padding:'10px 16px',cursor:'pointer',fontWeight:700,fontSize:14,opacity:loading||!input.trim()?0.5:1}}>↑</button>
+    </div>
+  </div>;
+}
+
+// ── BACKTEST ───────────────────────────────────────────────────────
+function Backtest({cases,onSave,onDelete}){
+  const ec=()=>({id:Date.now(),data:today(),par:'',nivel:'',tf:'',confluencias:[],tinha_lt_choch:false,retestou:false,tipo_retest:'',mm_proxima:false,mm_respeitou:'',candles_ate_alvo:'',lt_forca:'',ate_onde_foi:'',saiu_antes:false,motivo_saiu:'',contexto:'',notas:''});
+  const[adding,setAdding]=useState(false);
+  const[form,setForm]=useState(ec());
+  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+  const total=cases.length;
+  const wLT=cases.filter(c=>c.tinha_lt_choch).length;
+  const wRet=cases.filter(c=>c.retestou&&c.tipo_retest!=='Invalidou').length;
+  const wTgt=cases.filter(c=>c.ate_onde_foi==='0 (alvo)'||c.ate_onde_foi==='Rompeu').length;
+  const MC=({options,selected,onChange})=><div style={{display:'flex',flexWrap:'wrap',gap:6}}>{options.map(o=>{const a=selected.includes(o);return<button key={o}onClick={()=>onChange(a?selected.filter(s=>s!==o):[...selected,o])}style={{background:a?'#6366f133':'transparent',border:`1px solid ${a?'#6366f1':'#1e3a5f'}`,borderRadius:6,color:a?'#a5b4fc':'#475569',padding:'4px 10px',cursor:'pointer',fontSize:12}}>{o}</button>;})}</div>;
+  return<div style={{display:'grid',gap:14}}>
+    <Card><SLabel color="#f59e0b">📋 BACKTEST FIBO — META: 30 CASOS</SLabel>
+      <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}><div style={{flex:1,background:'#1e3a5f',borderRadius:20,height:8}}><div style={{width:`${Math.min((total/30)*100,100)}%`,background:'#6366f1',borderRadius:20,height:8,transition:'width 0.3s'}}/></div><span style={{color:'#6366f1',fontWeight:700}}>{total}/30</span></div>
+      {total>0&&<div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginTop:8}}>{[['Com LT/CHoCH',`${wLT}/${total}`,'#22c55e'],['Retest válido',`${wRet}/${total}`,'#6366f1'],['Atingiu alvo',`${wTgt}/${total}`,'#f59e0b']].map(([l,v,c])=><div key={l}style={{background:'#060d1f',borderRadius:8,padding:'8px 10px'}}><div style={{color:'#475569',fontSize:10}}>{l}</div><div style={{color:c,fontWeight:700}}>{v}</div></div>)}</div>}
+    </Card>
+    {!adding&&<PBtn onClick={()=>setAdding(true)}style={{alignSelf:'flex-start'}}>+ Adicionar Caso</PBtn>}
+    {adding&&<Card><SLabel>NOVO CASO</SLabel><div style={{display:'grid',gap:12}}>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:10}}>
+        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>DATA</label><Inp value={form.data}onChange={v=>set('data',v)}placeholder="DD/MM/YYYY"/></div>
+        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>PAR *</label><Sel value={form.par}onChange={v=>set('par',v)}options={ALL_PAIRS}placeholder="Selecione"/></div>
+        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>NÍVEL *</label><Sel value={form.nivel}onChange={v=>set('nivel',v)}options={FIBO_LEVELS}placeholder="Selecione"/></div>
+        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>TF</label><Sel value={form.tf}onChange={v=>set('tf',v)}options={TIMEFRAMES}placeholder="—"/></div>
+      </div>
+      <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:6}}>CONFLUÊNCIAS</label><MC options={FIBO_CONF}selected={form.confluencias}onChange={v=>set('confluencias',v)}/></div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+        <Tog value={form.tinha_lt_choch}onChange={v=>set('tinha_lt_choch',v)}label="Tinha LT ou CHoCH forte?"/>
+        <Tog value={form.retestou}onChange={v=>set('retestou',v)}label="Retestou antes de ir?"/>
+      </div>
+      {form.retestou&&<div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>TIPO RETEST</label><Sel value={form.tipo_retest}onChange={v=>set('tipo_retest',v)}options={RETEST_TYPES}placeholder="—"/></div>}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+        <Tog value={form.mm_proxima}onChange={v=>set('mm_proxima',v)}label="MM20/50 próxima?"/>
+        {form.mm_proxima&&<div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>PREÇO RESPEITOU</label><Sel value={form.mm_respeitou}onChange={v=>set('mm_respeitou',v)}options={['MM antes do Fibo','Fibo exato','Passou os dois']}placeholder="—"/></div>}
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
+        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>CANDLES ATÉ ALVO</label><Inp value={form.candles_ate_alvo}onChange={v=>set('candles_ate_alvo',v)}placeholder="ex: 8"type="number"/></div>
+        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>FORÇA LT</label><Sel value={form.lt_forca}onChange={v=>set('lt_forca',v)}options={LT_STRENGTH}placeholder="—"/></div>
+        <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>ATÉ ONDE FOI</label><Sel value={form.ate_onde_foi}onChange={v=>set('ate_onde_foi',v)}options={TARGETS}placeholder="—"/></div>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+        <Tog value={form.saiu_antes}onChange={v=>set('saiu_antes',v)}label="Saiu antes do alvo?"/>
+        {form.saiu_antes&&<Inp value={form.motivo_saiu}onChange={v=>set('motivo_saiu',v)}placeholder="Por quê saiu antes?"/>}
+      </div>
+      <div><label style={{color:'#64748b',fontSize:11,display:'block',marginBottom:4}}>CONTEXTO</label><Sel value={form.contexto}onChange={v=>set('contexto',v)}options={CONTEXTS}placeholder="—"/></div>
+      <textarea value={form.notas}onChange={e=>set('notas',e.target.value)}placeholder="Notas..."style={{width:'100%',minHeight:60,background:'#060d1f',border:'1px solid #1e3a5f',borderRadius:8,color:'#f1f5f9',fontSize:12,padding:8,resize:'vertical',fontFamily:'inherit',outline:'none'}}/>
+      <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}><GBtn onClick={()=>{setAdding(false);setForm(ec());}}>Cancelar</GBtn><PBtn onClick={()=>{if(!form.par||!form.nivel)return;onSave({...form});setForm(ec());setAdding(false);}}>💾 Salvar</PBtn></div>
+    </div></Card>}
+    {cases.length===0&&!adding&&<div style={{textAlign:'center',padding:48,color:'#334155'}}><div style={{fontSize:32,marginBottom:8}}>🔬</div>Nenhum caso ainda. Meta: 30 casos.</div>}
+    {cases.map((c,i)=><Card key={c.id||i}><div style={{display:'flex',justifyContent:'space-between'}}><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><span style={{fontWeight:700,color:'#f1f5f9'}}>#{i+1} {c.par}</span><span style={{color:'#6366f1',fontSize:12}}>Fibo {c.nivel}</span><span style={{color:'#475569',fontSize:12}}>{c.data}</span>{c.tinha_lt_choch?<span style={{color:'#22c55e',fontSize:11}}>✓ LT/CHoCH</span>:<span style={{color:'#ef4444',fontSize:11}}>✗ Sem LT/CHoCH</span>}<span style={{color:'#f59e0b',fontSize:11}}>→ {c.ate_onde_foi||'—'}</span></div><button onClick={()=>onDelete(i)}style={{background:'none',border:'none',color:'#334155',cursor:'pointer',fontSize:16}}>×</button></div>{c.confluencias?.length>0&&<div style={{marginTop:8,display:'flex',gap:4,flexWrap:'wrap'}}>{c.confluencias.map(cf=><span key={cf}style={{background:'#1e3a5f',color:'#94a3b8',fontSize:10,padding:'2px 7px',borderRadius:10}}>{cf}</span>)}</div>}{c.notas&&<div style={{color:'#64748b',fontSize:12,marginTop:6,fontStyle:'italic'}}>📝 {c.notas}</div>}</Card>)}
+  </div>;
+}
+
+// ── APP ────────────────────────────────────────────────────────────
+function App(){
+  const[tab,setTab]=useState('journal');
+  const[trades,setTrades]=useState([]);
+  const[bt,setBt]=useState([]);
+  const[showForm,setShowForm]=useState(false);
+  const[filter,setFilter]=useState({setup:'',resultado:'',days:''});
+
+  useEffect(()=>{try{const t=localStorage.getItem('zt');if(t)setTrades(JSON.parse(t));const b=localStorage.getItem('zb');if(b)setBt(JSON.parse(b));}catch{}},[]);
+  useEffect(()=>{try{localStorage.setItem('zt',JSON.stringify(trades));}catch{}},[trades]);
+  useEffect(()=>{try{localStorage.setItem('zb',JSON.stringify(bt));}catch{}},[bt]);
+
+  const dpnl=getDailyPnl(trades);
+  const cl=getConsecLosses(trades);
+  const stats=calcStats(trades);
+  const tod=trades.filter(t=>t.data===today());
+
+  const filtered=trades.filter(t=>{
+    if(filter.setup&&t.setup!==filter.setup)return false;
+    if(filter.resultado&&t.resultado!==filter.resultado)return false;
+    if(filter.days){const[d,m,y]=(t.data||'').split('/');if(d&&new Date(`${y}-${m}-${d}`)<new Date(Date.now()-parseInt(filter.days)*86400000))return false;}
+    return true;
+  });
+
+  function exportJ(){const b=new Blob([JSON.stringify({trades,bt},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`diario-${today().replace(/\//g,'-')}.json`;a.click();}
+  function importJ(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.trades)setTrades(d.trades);if(d.bt)setBt(d.bt);}catch{alert('Arquivo inválido.');}};r.readAsText(f);}
+
+  const TABS=[{id:'journal',label:'📝 Diário'},{id:'stats',label:'📊 Stats'},{id:'backtest',label:'🔬 Backtest'},{id:'chat',label:'💬 Zella IA'}];
+
+  return<div style={{minHeight:'100vh',background:'#060d1f',color:'#f1f5f9',fontFamily:'system-ui,-apple-system,sans-serif'}}>
+    {/* Header */}
+    <div style={{background:'#080f23',borderBottom:'1px solid #1e3a5f',padding:'12px 20px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+      <div style={{display:'flex',alignItems:'center',gap:10}}>
+        <div style={{width:34,height:34,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900,fontSize:16}}>Z</div>
+        <div><div style={{fontWeight:800,fontSize:16}}>Diário <span style={{color:'#6366f1'}}>Zella</span></div><div style={{color:'#334155',fontSize:10}}>Exness Zero · TradingView · M2/M5</div></div>
+      </div>
+      <div style={{display:'flex',gap:8}}>
+        <label style={{background:'#0d1526',border:'1px solid #1e3a5f',borderRadius:7,color:'#64748b',padding:'6px 12px',cursor:'pointer',fontSize:11}}>📥 Importar<input type="file"accept=".json"onChange={importJ}style={{display:'none'}}/></label>
+        <button onClick={exportJ}style={{background:'none',border:'1px solid #1e3a5f',borderRadius:8,color:'#64748b',padding:'6px 12px',cursor:'pointer',fontSize:11}}>📤 Exportar</button>
+      </div>
+    </div>
+    {/* Stats bar */}
+    <div style={{background:'#08111f',borderBottom:'1px solid #1e3a5f',padding:'10px 20px',display:'flex',gap:24,overflowX:'auto'}}>
+      {[['P&L Total',fmt(stats?.totalPnl??0),(stats?.totalPnl??0)>=0?'#22c55e':'#ef4444'],['Win Rate',stats?`${stats.winRate}%`:'—',(stats?.winRate??0)>=50?'#22c55e':'#ef4444'],['Profit Factor',stats?.pf??'—',parseFloat(stats?.pf)>=1.5?'#22c55e':'#f59e0b'],['Hoje',fmt(dpnl),dpnl>=0?'#22c55e':'#ef4444'],['Losses consec.',cl,cl>=2?'#ef4444':'#f1f5f9'],['Capital',`$${CAPITAL}`,'#6366f1']].map(([l,v,c])=><div key={l}style={{flexShrink:0}}><div style={{color:'#334155',fontSize:10,fontWeight:600}}>{l}</div><div style={{color:c,fontWeight:700,fontSize:15}}>{v}</div></div>)}
+    </div>
+    {/* Alert */}
+    {(dpnl<=-MAX_DAILY_LOSS||cl>=MAX_CONSEC)&&<div style={{background:'#2d0606',border:'1px solid #ef4444',borderRadius:10,padding:'12px 16px',margin:'12px 16px',display:'flex',alignItems:'center',gap:10}}><span style={{fontSize:20}}>🛑</span><div><div style={{color:'#ef4444',fontWeight:700,fontSize:14}}>ENCERRE O DIA AGORA</div><div style={{color:'#fca5a5',fontSize:12,marginTop:2}}>{cl>=MAX_CONSEC?`${cl} losses consecutivos. `:''}${dpnl<=-MAX_DAILY_LOSS?`Perda de ${fmt(dpnl)} atingida. `:''}Fecha o gráfico. Vai fazer exercício ou tocar violão. 🎸</div></div></div>}
+    {/* Tabs */}
+    <div style={{background:'#080f23',borderBottom:'1px solid #1e3a5f',display:'flex',overflowX:'auto'}}>
+      {TABS.map(t=><button key={t.id}onClick={()=>setTab(t.id)}style={{background:'none',border:'none',borderBottom:`2px solid ${tab===t.id?'#6366f1':'transparent'}`,color:tab===t.id?'#6366f1':'#475569',padding:'11px 18px',cursor:'pointer',fontWeight:600,fontSize:13,whiteSpace:'nowrap'}}>{t.label}</button>)}
+    </div>
+    {/* Content */}
+    <div style={{maxWidth:860,margin:'0 auto',padding:'20px 16px'}}>
+      {tab==='journal'&&<div>
+        {!showForm?<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}><div style={{color:'#475569',fontSize:12}}>{trades.length} trades · {tod.length} hoje</div><PBtn onClick={()=>setShowForm(true)}>+ Registrar Trade</PBtn></div>:<TradeForm onSave={t=>{setTrades(p=>[t,...p]);setShowForm(false);}} onCancel={()=>setShowForm(false)}/>}
+        {trades.length>0&&<div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
+          {[{k:'setup',opts:['Pivot','Fibo']},{k:'resultado',opts:['Win','Loss','BE']},{k:'days',opts:['7','30','90']}].map(({k,opts})=><select key={k}value={filter[k]}onChange={e=>setFilter(f=>({...f,[k]:e.target.value}))}style={{background:'#0d1526',border:'1px solid #1e3a5f',borderRadius:8,color:filter[k]?'#f1f5f9':'#475569',fontSize:12,padding:'6px 10px',outline:'none'}}><option value="">{k==='days'?'Período':k==='setup'?'Setup':'Resultado'}: Todos</option>{opts.map(o=><option key={o}value={o}>{k==='days'?`Últimos ${o} dias`:o}</option>)}</select>)}
+          {Object.values(filter).some(Boolean)&&<button onClick={()=>setFilter({setup:'',resultado:'',days:''})}style={{background:'none',border:'1px solid #1e3a5f',borderRadius:8,color:'#64748b',padding:'6px 10px',cursor:'pointer',fontSize:11}}>Limpar</button>}
+          <span style={{color:'#334155',fontSize:11,alignSelf:'center'}}>{filtered.length} trades</span>
+        </div>}
+        {filtered.length===0&&!showForm&&<div style={{textAlign:'center',padding:'48px 24px',color:'#334155',background:'#0d1526',borderRadius:14,border:'1px dashed #1e3a5f'}}><div style={{fontSize:36,marginBottom:10}}>📈</div><div style={{fontWeight:700,fontSize:15,marginBottom:6,color:'#475569'}}>{trades.length===0?'Nenhum trade ainda':'Sem trades com esse filtro'}</div><div style={{fontSize:13}}>{trades.length===0?'Clique em "+ Registrar Trade"':'Tente ajustar os filtros'}</div></div>}
+        {filtered.map((t,i)=><TradeCard key={i}trade={t}onDelete={()=>{if(window.confirm('Remover?'))setTrades(p=>p.filter(x=>x!==t));}}/>)}
+      </div>}
+      {tab==='stats'&&<Stats trades={trades}/>}
+      {tab==='backtest'&&<Backtest cases={bt}onSave={c=>setBt(p=>[...p,c])}onDelete={i=>setBt(p=>p.filter((_,j)=>j!==i))}/>}
+      {tab==='chat'&&<div style={{background:'#0d1526',borderRadius:14,padding:20,border:'1px solid #1e3a5f'}}><div style={{color:'#6366f1',fontSize:11,fontWeight:700,letterSpacing:0.8,marginBottom:14}}>💬 ZELLA — SUA IA DE TRADING</div><Chat trades={trades}/></div>}
+    </div>
+  </div>;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
