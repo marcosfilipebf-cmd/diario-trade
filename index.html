@@ -217,7 +217,7 @@ IMPORTANTE: "regioes", "gatilhos", "filtros" e "confluencias" são ARRAYS (um tr
 function badge(text,color){return `<span class="badge" style="background:${color}22;color:${color};border:1px solid ${color}44">${escHtml(String(text))}</span>`;}
 function toggle(checked,onchange,label){return `<label class="toggle-wrap"><div class="toggle-track" style="background:${checked?'#6366f1':'#1e3a5f'}" onclick="${onchange}"><div class="toggle-thumb" style="left:${checked?18:3}px"></div></div>${label?`<span style="color:#94a3b8;font-size:13px">${label}</span>`:''}</label>`;}
 function sel(val,opts,onchange,placeholder=''){return `<select onchange="${onchange}"><option value="">${placeholder}</option>${opts.map(o=>`<option value="${escHtml(o)}"${val===o?'selected':''}>${escHtml(o)}</option>`).join('')}</select>`;}
-function inp(val,onchange,placeholder='',type='text'){return `<input type="${type}" value="${escHtml(String(val||''))}" oninput="${onchange}" placeholder="${placeholder}">`;}
+function inp(val,onchange,placeholder='',type='text'){return `<input type="${type}" value="${escHtml(String(val||''))}" oninput="${onchange.replace('setFD(','setFDq(')}" placeholder="${placeholder}">`;}
 function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function chips(opts,selected,fn,color='#6366f1'){
   return `<div style="display:flex;flex-wrap:wrap;gap:6px">${opts.map((o,i)=>{
@@ -483,7 +483,7 @@ function renderForm(RPT){
       <div style="background:#060d1f;border-radius:8px;padding:12px;border:1px solid #f59e0b33">
         <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
           ${toggle(f.saiu_parcial,"toggleFD('saiu_parcial')",'Saiu parcial')}
-          ${f.saiu_parcial?`<div style="display:flex;align-items:center;gap:8px"><span style="color:#94a3b8;font-size:12px">Em quanto % do alvo?</span><input type="number" value="${f.parcial_pct||''}" oninput="setFD('parcial_pct',this.value)" placeholder="50" style="width:80px" min="1" max="100"></div>`:''}
+          ${f.saiu_parcial?`<div style="display:flex;align-items:center;gap:8px"><span style="color:#94a3b8;font-size:12px">Em quanto % do alvo?</span><input type="number" value="${f.parcial_pct||''}" oninput="setFDq('parcial_pct',this.value)" placeholder="50" style="width:80px" min="1" max="100"></div>`:''}
         </div>
       </div>
 
@@ -495,11 +495,11 @@ function renderForm(RPT){
       ${c.hasFibo&&f.setup==='Fibo'?renderFiboFields(f):''}
 
       <div class="grid2">
-        <div><label class="label">ACERTOS</label><textarea oninput="setFD('acertos',this.value)" style="min-height:60px;resize:vertical">${escHtml(f.acertos||'')}</textarea></div>
-        <div><label class="label">ERROS</label><textarea oninput="setFD('erros',this.value)" style="min-height:60px;resize:vertical">${escHtml(f.erros||'')}</textarea></div>
+        <div><label class="label">ACERTOS</label><textarea oninput="setFDq('acertos',this.value)" style="min-height:60px;resize:vertical">${escHtml(f.acertos||'')}</textarea></div>
+        <div><label class="label">ERROS</label><textarea oninput="setFDq('erros',this.value)" style="min-height:60px;resize:vertical">${escHtml(f.erros||'')}</textarea></div>
       </div>
 
-      <div><label class="label">NOTAS</label><textarea oninput="setFD('notas',this.value)" style="min-height:50px;resize:vertical">${escHtml(f.notas||'')}</textarea></div>
+      <div><label class="label">NOTAS</label><textarea oninput="setFDq('notas',this.value)" style="min-height:50px;resize:vertical">${escHtml(f.notas||'')}</textarea></div>
 
       <div>
         <label class="label">📷 PRINT DO GRÁFICO</label>
@@ -824,6 +824,7 @@ function hideForm(){ui.showForm=false;ui._editIdx=null;render();}
 function setFormMode(m){ui.formMode=m;render();}
 function setFormTxt(v){ui.formTxt=v;}
 function setFD(k,v){ui.formData[k]=v;render();}
+function setFDq(k,v){ui.formData[k]=v;}
 function toggleFD(k){
   if(k==='lt_rompimento_forte')ui.formData[k]=ui.formData[k]===true?false:true;
   else ui.formData[k]=!ui.formData[k];
