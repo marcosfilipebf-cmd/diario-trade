@@ -120,7 +120,7 @@ function initJournal(key){
 }
 
 let ui={tab:'journal',showForm:false,
-  filter:{setup:'',resultado:'',par:'',periodo:'',diaSemana:'',regiao:'',gatilho:'',confluencias:[],filtros:[],filtrosOk:''},
+  filter:{setup:'',resultado:'',par:'',periodo:'',diaSemana:'',regioes:[],gatilhos:[],confluencias:[],filtros:[],filtrosOk:''},
   formMode:'texto',formTxt:'',formData:null,formLoading:false,formErr:'',openTrades:{},_editIdx:null};
 
 function J(){return journals[activeJournal];}
@@ -128,7 +128,7 @@ function CFG(){return JOURNALS[activeJournal];}
 function isLiq(){return CFG().mode==='liquidity';}
 
 function emptyForm(){
-  return {par:'',setup:'',regiao:'',gatilho:'',direcao:'',resultado:'',pnl:'',rr_realizado:'',
+  return {par:'',setup:'',regioes:[],gatilhos:[],direcao:'',resultado:'',pnl:'',rr_realizado:'',
   filtros:[],confluencias:[],
   saiu_parcial:false,parcial_pct:'',
   fibo_nivel:'',timeframe:'',sessao:'',emocao:'',seguiu_regras:true,moveu_be_cedo:false,tinha_confluencia:true,lt_rompimento_forte:null,
@@ -146,6 +146,15 @@ try{
   }
 }catch{}
 try{const a=localStorage.getItem('zactive');if(a&&JOURNALS[a])activeJournal=a;}catch{}
+// migração: regiao/gatilho (texto) -> regioes/gatilhos (lista)
+Object.keys(journals).forEach(k=>{
+  (journals[k].trades||[]).forEach(t=>{
+    if(t.regiao&&!t.regioes)t.regioes=[t.regiao];
+    if(t.gatilho&&!t.gatilhos)t.gatilhos=[t.gatilho];
+    if(!t.regioes)t.regioes=[];
+    if(!t.gatilhos)t.gatilhos=[];
+  });
+});
 ui.formData=emptyForm();
 
 function save(){
@@ -200,8 +209,8 @@ function getPARSE_PROMPT(){
   return `Você é especialista em análise de trades (${c.name}). Capital ${c.currency}${j.capital}, risco ${c.currency}${riskPerTrade().toFixed(2)}/operação (${j.riskPct}%), máximo ${j.maxConsec} stops no dia ou ${j.maxLossPct}% de perda.${extra}
 Ativos: ${j.pairs.join(', ')}.
 Extraia o trade descrito e retorne SOMENTE JSON sem markdown:
-{"par":"${j.pairs[0]||''}",${isLiq()?`"regiao":"","gatilho":"","filtros":[],"confluencias":[],"setup":""`:`"setup":"","regiao":"","gatilho":"","filtros":[],"confluencias":[]`},"direcao":"Compra","resultado":"Win","pnl":${riskPerTrade().toFixed(2)},"rr_realizado":1,"saiu_parcial":false,"parcial_pct":null,"fibo_nivel":null,"timeframe":"M1","sessao":"","emocao":"Neutro","seguiu_regras":true,"moveu_be_cedo":false,"tinha_confluencia":true,"erros":null,"acertos":null,"data":"${today()}","notas":null,"resumo_ia":"análise com dica de melhoria","score":7}
-IMPORTANTE: "filtros" e "confluencias" são ARRAYS. Inclua TODOS os itens mencionados, não apenas um. Exemplo: "filtros":["Preço esticado","Frequência baixa","Amplitude alta"], "confluencias":["POC","VWAP diária"]. Use os textos EXATOS das listas acima. Se nenhum foi mencionado, use [].`;
+{"par":"${j.pairs[0]||''}",${isLiq()?`"regioes":[],"gatilhos":[],"filtros":[],"confluencias":[],"setup":""`:`"setup":"","regiao":"","gatilho":"","filtros":[],"confluencias":[]`},"direcao":"Compra","resultado":"Win","pnl":${riskPerTrade().toFixed(2)},"rr_realizado":1,"saiu_parcial":false,"parcial_pct":null,"fibo_nivel":null,"timeframe":"M1","sessao":"","emocao":"Neutro","seguiu_regras":true,"moveu_be_cedo":false,"tinha_confluencia":true,"erros":null,"acertos":null,"data":"${today()}","notas":null,"resumo_ia":"análise com dica de melhoria","score":7}
+IMPORTANTE: "regioes", "gatilhos", "filtros" e "confluencias" são ARRAYS (um trade pode ter mais de uma região e mais de um gatilho ao mesmo tempo). Inclua TODOS os itens mencionados, não apenas um. Exemplo: "filtros":["Preço esticado","Frequência baixa","Amplitude alta"], "confluencias":["POC","VWAP diária"]. Use os textos EXATOS das listas acima. Se nenhum foi mencionado, use [].`;
 }
 
 // ── UI HELPERS ─────────────────────────────────────────────────────
@@ -230,8 +239,8 @@ function render(){
 
   const filtered=j.trades.filter(t=>{
     if(ui.filter.setup&&t.setup!==ui.filter.setup)return false;
-    if(ui.filter.regiao&&t.regiao!==ui.filter.regiao)return false;
-    if(ui.filter.gatilho&&t.gatilho!==ui.filter.gatilho)return false;
+    if(ui.filter.regioes.length&&!ui.filter.regioes.every(x=>(t.regioes||[]).includes(x)))return false;
+    if(ui.filter.gatilhos.length&&!ui.filter.gatilhos.every(x=>(t.gatilhos||[]).includes(x)))return false;
     if(ui.filter.confluencias.length&&!ui.filter.confluencias.every(x=>(t.confluencias||[]).includes(x)))return false;
     if(ui.filter.filtros.length&&!ui.filter.filtros.every(x=>(t.filtros||[]).includes(x)))return false;
     if(ui.filter.filtrosOk){
@@ -310,9 +319,7 @@ function render(){
     // ── FILTERS
     html+=`<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
       ${isLiq()
-        ?`<select onchange="setFilter('regiao',this.value)" style="width:auto"><option value="">Região: Todas</option>${j.regions.map(o=>`<option value="${escHtml(o)}"${ui.filter.regiao===o?'selected':''}>${escHtml(o)}</option>`).join('')}</select>
-          <select onchange="setFilter('gatilho',this.value)" style="width:auto"><option value="">Gatilho: Todos</option>${j.triggers.map(o=>`<option value="${escHtml(o)}"${ui.filter.gatilho===o?'selected':''}>${escHtml(o)}</option>`).join('')}</select>
-          <select onchange="setFilter('filtrosOk',this.value)" style="width:auto"><option value="">Filtros: Todos</option><option value="sim"${ui.filter.filtrosOk==='sim'?' selected':''}>✓ Todos atendidos</option><option value="nao"${ui.filter.filtrosOk==='nao'?' selected':''}>✗ Incompletos</option></select>`
+        ?`<select onchange="setFilter('filtrosOk',this.value)" style="width:auto"><option value="">Filtros: Todos</option><option value="sim"${ui.filter.filtrosOk==='sim'?' selected':''}>✓ Todos atendidos</option><option value="nao"${ui.filter.filtrosOk==='nao'?' selected':''}>✗ Incompletos</option></select>`
         :`<select onchange="setFilter('setup',this.value)" style="width:auto"><option value="">Setup: Todos</option>${j.setups.map(o=>`<option value="${o}"${ui.filter.setup===o?'selected':''}>${o}</option>`).join('')}</select>`}
       <select onchange="setFilter('resultado',this.value)" style="width:auto"><option value="">Resultado: Todos</option>${j.results.map(o=>`<option value="${o}"${ui.filter.resultado===o?'selected':''}>${o}</option>`).join('')}</select>
       ${j.pairs.length>1?`<select onchange="setFilter('par',this.value)" style="width:auto"><option value="">Ativo: Todos</option>${[...new Set(j.trades.map(t=>t.par).filter(Boolean))].map(o=>`<option value="${o}"${ui.filter.par===o?'selected':''}>${o}</option>`).join('')}</select>`:''}
@@ -322,8 +329,16 @@ function render(){
       <span style="color:#334155;font-size:11px">${filtered.length} trade${filtered.length!==1?'s':''}</span>
     </div>`;
 
-    if(isLiq()&&(j.confluences.length||j.filters.length)){
+    if(isLiq()&&(j.confluences.length||j.filters.length||j.regions.length||j.triggers.length)){
       html+=`<div style="background:#0d1526;border-radius:10px;padding:12px 14px;border:1px solid #1e3a5f;margin-bottom:14px;display:grid;gap:12px">
+        ${j.regions.length?`<div>
+          <div style="color:#8b5cf6;font-size:10px;font-weight:700;letter-spacing:0.6px;margin-bottom:7px">📍 FILTRAR POR REGIÃO ${ui.filter.regioes.length?`(${ui.filter.regioes.length} marcadas)`:'(selecione uma ou mais)'}</div>
+          ${chips(j.regions,ui.filter.regioes,'toggleFilterRegiao','#8b5cf6')}
+        </div>`:''}
+        ${j.triggers.length?`<div>
+          <div style="color:#06b6d4;font-size:10px;font-weight:700;letter-spacing:0.6px;margin-bottom:7px">⚡ FILTRAR POR GATILHO ${ui.filter.gatilhos.length?`(${ui.filter.gatilhos.length} marcados)`:'(selecione um ou mais)'}</div>
+          ${chips(j.triggers,ui.filter.gatilhos,'toggleFilterGatilho','#06b6d4')}
+        </div>`:''}
         ${j.confluences.length?`<div>
           <div style="color:#f59e0b;font-size:10px;font-weight:700;letter-spacing:0.6px;margin-bottom:7px">🔗 FILTRAR POR CONFLUÊNCIAS ${ui.filter.confluencias.length?`— mostrando trades que têm TODAS as ${ui.filter.confluencias.length} marcadas`:'(selecione uma ou mais)'}</div>
           ${chips(j.confluences,ui.filter.confluencias,'toggleFilterConfl','#f59e0b')}
@@ -354,8 +369,8 @@ function render(){
           <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
             ${badge(t.resultado,rc)}
             <span style="font-weight:700;color:#f1f5f9;font-size:14px">${escHtml(t.par||'')}</span>
-            ${t.regiao?badge(t.regiao,'#8b5cf6'):''}
-            ${t.gatilho?badge(t.gatilho,'#06b6d4'):''}
+            ${(t.regioes||[]).map(r=>badge(r,'#8b5cf6')).join('')}
+            ${(t.gatilhos||[]).map(g=>badge(g,'#06b6d4')).join('')}
             ${t.setup?badge(t.setup,'#334155'):''}
             ${t.direcao?badge(t.direcao,t.direcao==='Compra'?'#22c55e':'#ef4444'):''}
             ${fok===true?badge('Filtros ✓','#22c55e'):fok===false?badge('Filtros ✗','#ef4444'):''}
@@ -419,12 +434,12 @@ function renderForm(RPT){
       ${f.resumo_ia?`<div style="background:#060d1f;border-radius:8px;padding:12px 14px;border:1px solid #6366f155"><div style="color:#6366f1;font-size:10px;font-weight:700;margin-bottom:6px">⚡ ANÁLISE IA</div><div style="color:#cbd5e1;font-size:13px;line-height:1.6">${escHtml(f.resumo_ia)}</div>${f.score?`<div style="color:#94a3b8;font-size:11px;margin-top:6px">Score: ${f.score}/10</div>`:''}</div>`:''}
 
       ${isLiq()
-        ?`<div class="grid4">
+        ?`<div class="grid2">
             <div><label class="label">ATIVO *</label>${sel(f.par,j.pairs,"setFD('par',this.value)",'Selecione')}</div>
-            <div><label class="label">REGIÃO *</label>${sel(f.regiao,j.regions,"setFD('regiao',this.value)",'Selecione')}</div>
-            <div><label class="label">GATILHO M1 *</label>${sel(f.gatilho,j.triggers,"setFD('gatilho',this.value)",'Selecione')}</div>
             <div><label class="label">RESULTADO *</label>${sel(f.resultado,j.results,"setFD('resultado',this.value)",'Selecione')}</div>
-          </div>`
+          </div>
+          <div><label class="label">📍 REGIÃO * ${(f.regioes||[]).length?`(${f.regioes.length})`:'— pode marcar mais de uma'}</label>${chips(j.regions,f.regioes,'toggleRegiao','#8b5cf6')}</div>
+          <div><label class="label">⚡ GATILHO M1 * ${(f.gatilhos||[]).length?`(${f.gatilhos.length})`:'— pode marcar mais de um'}</label>${chips(j.triggers,f.gatilhos,'toggleGatilho','#06b6d4')}</div>`
         :`<div class="grid3">
             <div><label class="label">PAR *</label>${sel(f.par,j.pairs,"setFD('par',this.value)",'Selecione')}</div>
             <div><label class="label">SETUP *</label>${sel(f.setup,j.setups,"setFD('setup',this.value)",'Selecione')}</div>
@@ -713,11 +728,15 @@ function renderStats(){
   }
 
   if(isLiq()){
-    html+=tt('📍 POR REGIÃO',gs(j.trades,'regiao'),'#8b5cf6');
-    html+=tt('⚡ POR GATILHO',gs(j.trades,'gatilho'),'#06b6d4');
+    html+=tt('📍 POR REGIÃO',gsArr(j.trades,'regioes'),'#8b5cf6');
+    html+=tt('⚡ POR GATILHO',gsArr(j.trades,'gatilhos'),'#06b6d4');
     // combo
     const combo={};
-    j.trades.forEach(t=>{if(!t.regiao||!t.gatilho)return;const k=`${t.regiao} + ${t.gatilho}`;if(!combo[k])combo[k]=[];combo[k].push(t);});
+    j.trades.forEach(t=>{
+      (t.regioes||[]).forEach(r=>{(t.gatilhos||[]).forEach(g=>{
+        const k=`${r} + ${g}`;if(!combo[k])combo[k]=[];combo[k].push(t);
+      });});
+    });
     const cr=Object.entries(combo).map(([label,ts])=>{
       const w=ts.filter(t=>t.resultado==='Win').length,l=ts.filter(t=>t.resultado==='Loss').length;
       const p=ts.reduce((s,t)=>s+(t.pnl||0),0);
@@ -796,7 +815,7 @@ function renderStats(){
 // ══════════════════════════════════════════════════════════════════
 function switchJournal(k){
   activeJournal=k;ui.showForm=false;ui.openTrades={};ui._editIdx=null;
-  ui.filter={setup:'',resultado:'',par:'',periodo:'',diaSemana:'',regiao:'',gatilho:'',confluencias:[],filtros:[],filtrosOk:''};
+  ui.filter={setup:'',resultado:'',par:'',periodo:'',diaSemana:'',regioes:[],gatilhos:[],confluencias:[],filtros:[],filtrosOk:''};
   ui.formData=emptyForm();save();render();
 }
 function setTab(t){ui.tab=t;render();}
@@ -816,6 +835,8 @@ function toggleInList(field,val){
   render();
 }
 function toggleFiltro(i){const v=J().filters[i];if(v!==undefined)toggleInList('filtros',v);}
+function toggleRegiao(i){const v=J().regions[i];if(v!==undefined)toggleInList('regioes',v);}
+function toggleGatilho(i){const v=J().triggers[i];if(v!==undefined)toggleInList('gatilhos',v);}
 function toggleConfluencia(i){const v=J().confluences[i];if(v!==undefined)toggleInList('confluencias',v);}
 function toggleConf(i){const v=FIBO_CONF[i];if(v!==undefined)toggleInList('bt_confluencias',v);}
 function setFilter(k,v){ui.filter[k]=v;render();}
@@ -825,8 +846,10 @@ function toggleFilterList(field,val){
   render();
 }
 function toggleFilterConfl(i){const v=J().confluences[i];if(v!==undefined)toggleFilterList('confluencias',v);}
+function toggleFilterRegiao(i){const v=J().regions[i];if(v!==undefined)toggleFilterList('regioes',v);}
+function toggleFilterGatilho(i){const v=J().triggers[i];if(v!==undefined)toggleFilterList('gatilhos',v);}
 function toggleFilterFiltro(i){const v=J().filters[i];if(v!==undefined)toggleFilterList('filtros',v);}
-function clearFilter(){ui.filter={setup:'',resultado:'',par:'',periodo:'',diaSemana:'',regiao:'',gatilho:'',confluencias:[],filtros:[],filtrosOk:''};render();}
+function clearFilter(){ui.filter={setup:'',resultado:'',par:'',periodo:'',diaSemana:'',regioes:[],gatilhos:[],confluencias:[],filtros:[],filtrosOk:''};render();}
 function toggleTrade(i){ui.openTrades[i]=!ui.openTrades[i];render();}
 function deleteTrade(i){if(confirm('Remover esse trade?')){J().trades.splice(i,1);save();render();}}
 function updateCapital(v){const n=parseFloat(v);if(n>0){J().capital=n;save();render();}}
@@ -890,7 +913,11 @@ async function parseForm(){
     const extraF=scanText(txt,jj.filters).filter(x=>!fl.includes(x));
     const extraC=scanText(txt,jj.confluences).filter(x=>!cf.includes(x));
     fl=[...fl,...extraF];cf=[...cf,...extraC];
-    ui.formData={...emptyForm(),...p,filtros:fl,confluencias:cf,bt_confluencias:normList(p.bt_confluencias,FIBO_CONF)};
+    let rg=normList(p.regioes||p.regiao,jj.regions);
+    let gt=normList(p.gatilhos||p.gatilho,jj.triggers);
+    rg=[...rg,...scanText(txt,jj.regions).filter(x=>!rg.includes(x))];
+    gt=[...gt,...scanText(txt,jj.triggers).filter(x=>!gt.includes(x))];
+    ui.formData={...emptyForm(),...p,regioes:rg,gatilhos:gt,filtros:fl,confluencias:cf,bt_confluencias:normList(p.bt_confluencias,FIBO_CONF)};
     ui.formMode='manual';
   }catch{ui.formErr='Não consegui interpretar. Tente descrever com mais detalhes.';}
   ui.formLoading=false;render();
@@ -898,8 +925,8 @@ async function parseForm(){
 
 function saveTrade(){
   const f=ui.formData,c=CFG();
-  const missing=isLiq()?(!f.par||!f.regiao||!f.gatilho||!f.resultado):(!f.par||!f.setup||!f.resultado);
-  if(missing){ui.formErr=isLiq()?'Preencha: ativo, região, gatilho e resultado.':'Preencha: par, setup e resultado.';render();return;}
+  const missing=isLiq()?(!f.par||!(f.regioes||[]).length||!(f.gatilhos||[]).length||!f.resultado):(!f.par||!f.setup||!f.resultado);
+  if(missing){ui.formErr=isLiq()?'Preencha: ativo, ao menos uma região, ao menos um gatilho e resultado.':'Preencha: par, setup e resultado.';render();return;}
   const trade={...f,pnl:Number(f.pnl)||0,rr_realizado:Number(f.rr_realizado)||null,parcial_pct:f.parcial_pct?Number(f.parcial_pct):null};
   if(ui._editIdx!=null){J().trades[ui._editIdx]=trade;ui._editIdx=null;}
   else{J().trades.unshift(trade);}
@@ -952,8 +979,8 @@ function openClaude(){
   const s=calcStats(j.trades);
   const resumo=j.trades.slice(0,25).map(t=>{
     const p=[t.data,t.par];
-    if(t.regiao)p.push(t.regiao);
-    if(t.gatilho)p.push(t.gatilho);
+    if((t.regioes||[]).length)p.push(t.regioes.join('+'));
+    if((t.gatilhos||[]).length)p.push(t.gatilhos.join('+'));
     if(t.setup)p.push(t.setup);
     const fok=allFiltersOk(t);
     if(fok!==null)p.push(fok?'filtros:OK':`filtros:faltou(${j.filters.filter(x=>!(t.filtros||[]).includes(x)).join('/')})`);
