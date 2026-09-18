@@ -121,7 +121,7 @@ function initJournal(key){
 
 let ui={tab:'journal',showForm:false,
   filter:{setup:'',resultado:'',par:'',periodo:'',diaSemana:'',regioes:[],gatilhos:[],confluencias:[],filtros:[],filtrosOk:''},
-  formMode:'texto',formTxt:'',formData:null,formLoading:false,formErr:'',openTrades:{},_editIdx:null};
+  formMode:'texto',formTxt:'',formImg:null,formData:null,formLoading:false,formErr:'',openTrades:{},_editIdx:null};
 
 function J(){return journals[activeJournal];}
 function CFG(){return JOURNALS[activeJournal];}
@@ -130,7 +130,7 @@ function isLiq(){return CFG().mode==='liquidity';}
 function emptyForm(){
   return {par:'',setup:'',regioes:[],gatilhos:[],direcao:'',resultado:'',pnl:'',rr_realizado:'',
   filtros:[],confluencias:[],
-  saiu_parcial:false,parcial_pct:'',
+  pontos_stop:'',pontos_gain:'',saiu_parcial:false,parcial_pct:'',
   fibo_nivel:'',timeframe:'',sessao:'',emocao:'',seguiu_regras:true,moveu_be_cedo:false,tinha_confluencia:true,lt_rompimento_forte:null,
   erros:'',acertos:'',data:today(),notas:'',resumo_ia:'',score:null,imagem:null,
   bt_confluencias:[],bt_tinha_lt_choch:false,bt_retestou:false,bt_tipo_retest:'',bt_mm_proxima:false,bt_mm_respeitou:'',bt_candles_ate_alvo:'',bt_lt_forca:'',bt_ate_onde_foi:'',bt_saiu_antes:false,bt_motivo_saiu:'',bt_contexto:''};
@@ -200,6 +200,11 @@ function calcStats(trades){
   return{totalPnl,wins:wins.length,losses:losses.length,winRate:Math.round((wins.length/trades.length)*100),pf,avgRR};
 }
 function rcColor(r){return RC_DEFAULT[r]||'#6366f1';}
+function rrPlan(t){
+  const st=parseFloat(t.pontos_stop),gn=parseFloat(t.pontos_gain);
+  if(!st||!gn||st<=0)return null;
+  return (gn/st).toFixed(2);
+}
 
 function getPARSE_PROMPT(){
   const j=J(),c=CFG();
@@ -208,9 +213,9 @@ function getPARSE_PROMPT(){
     :`\nSetups: ${j.setups.join(', ')}.`;
   return `Você é especialista em análise de trades (${c.name}). Capital ${c.currency}${j.capital}, risco ${c.currency}${riskPerTrade().toFixed(2)}/operação (${j.riskPct}%), máximo ${j.maxConsec} stops no dia ou ${j.maxLossPct}% de perda.${extra}
 Ativos: ${j.pairs.join(', ')}.
-Extraia o trade descrito e retorne SOMENTE JSON sem markdown:
-{"par":"${j.pairs[0]||''}",${isLiq()?`"regioes":[],"gatilhos":[],"filtros":[],"confluencias":[],"setup":""`:`"setup":"","regiao":"","gatilho":"","filtros":[],"confluencias":[]`},"direcao":"Compra","resultado":"Win","pnl":${riskPerTrade().toFixed(2)},"rr_realizado":1,"saiu_parcial":false,"parcial_pct":null,"fibo_nivel":null,"timeframe":"M1","sessao":"","emocao":"Neutro","seguiu_regras":true,"moveu_be_cedo":false,"tinha_confluencia":true,"erros":null,"acertos":null,"data":"${today()}","notas":null,"resumo_ia":"análise com dica de melhoria","score":7}
-IMPORTANTE: "regioes", "gatilhos", "filtros" e "confluencias" são ARRAYS (um trade pode ter mais de uma região e mais de um gatilho ao mesmo tempo). Inclua TODOS os itens mencionados, não apenas um. Exemplo: "filtros":["Preço esticado","Frequência baixa","Amplitude alta"], "confluencias":["POC","VWAP diária"]. Use os textos EXATOS das listas acima. Se nenhum foi mencionado, use [].`;
+Se receber uma IMAGEM de relatório de performance (Nelogica/Profit/corretora), leia a tabela e extraia os dados da operação. Retorne SOMENTE JSON sem markdown:
+{"par":"${j.pairs[0]||''}",${isLiq()?`"regioes":[],"gatilhos":[],"filtros":[],"confluencias":[],"setup":""`:`"setup":"","regiao":"","gatilho":"","filtros":[],"confluencias":[]`},"direcao":"Compra","resultado":"Win","pnl":${riskPerTrade().toFixed(2)},"rr_realizado":1,"pontos_stop":null,"pontos_gain":null,"saiu_parcial":false,"parcial_pct":null,"fibo_nivel":null,"timeframe":"M1","sessao":"","emocao":"Neutro","seguiu_regras":true,"moveu_be_cedo":false,"tinha_confluencia":true,"erros":null,"acertos":null,"data":"${today()}","notas":null,"resumo_ia":"análise com dica de melhoria","score":7}
+IMPORTANTE: "regioes", "gatilhos", "filtros" e "confluencias" são ARRAYS (um trade pode ter mais de uma região e mais de um gatilho ao mesmo tempo). Inclua TODOS os itens mencionados, não apenas um. Exemplo: "filtros":["Preço esticado","Frequência baixa","Amplitude alta"], "confluencias":["POC","VWAP diária"]. Use os textos EXATOS das listas acima. Se nenhum foi mencionado, use []. Para "pontos_stop" e "pontos_gain" extraia os pontos mencionados (ex: "stop de 150 pontos e alvo de 450" -> pontos_stop:150, pontos_gain:450).`;
 }
 
 // ── UI HELPERS ─────────────────────────────────────────────────────
@@ -375,6 +380,7 @@ function render(){
             ${t.direcao?badge(t.direcao,t.direcao==='Compra'?'#22c55e':'#ef4444'):''}
             ${fok===true?badge('Filtros ✓','#22c55e'):fok===false?badge('Filtros ✗','#ef4444'):''}
             ${(t.confluencias||[]).length?badge(`${t.confluencias.length} confl.`,'#f59e0b'):''}
+            ${t.pontos_stop&&t.pontos_gain?badge(`${t.pontos_stop}→${t.pontos_gain}pts`,'#6366f1'):''}
             ${t.saiu_parcial?badge(`Parcial ${t.parcial_pct||''}${t.parcial_pct?'%':''}`,'#f59e0b'):''}
             <span style="color:#475569;font-size:11px">${escHtml(t.data||'')}${weekday(t.data)?' · '+weekday(t.data):''}</span>
             ${t.sessao?`<span style="color:#475569;font-size:11px">· ${escHtml(t.sessao)}</span>`:''}
@@ -418,12 +424,28 @@ function renderForm(RPT){
       ?`Descreva o trade:&#10;&#10;&quot;WIN captura de liquidez, pivô oculto no M1, preço esticado, frequência baixa, amplitude alta, indicador barato. POC e VWAP diária como confluência. Compra, win, parcial em 50%&quot;`
       :`Descreva o trade:&#10;&#10;&quot;Pivot compra EURUSD M5, win, confiante, segui o setup&quot;`;
     html+=`<textarea id="formtxt" oninput="setFormTxt(this.value)" placeholder="${ph}" style="width:100%;min-height:110px;resize:vertical">${escHtml(ui.formTxt)}</textarea>
+
+      <div style="margin-top:12px">
+        ${ui.formImg
+          ?`<div style="background:#060d1f;border:1px solid #22c55e44;border-radius:8px;padding:10px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <span style="color:#22c55e;font-size:11px;font-weight:700">📷 Print anexado — a IA vai ler os dados da imagem</span>
+                <button onclick="clearFormImg()" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:16px">×</button>
+              </div>
+              <img src="${ui.formImg}" style="max-height:160px;max-width:100%;border-radius:6px;border:1px solid #1e3a5f">
+            </div>`
+          :`<label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#060d1f;border:1px dashed #1e3a5f;border-radius:8px;padding:11px;color:#475569;font-size:13px">
+              <span>📷 Anexar print do relatório de performance (opcional — a IA lê os dados)</span>
+              <input type="file" accept="image/*" onchange="loadFormImg(event)" style="display:none;width:auto">
+            </label>`}
+      </div>
+
       ${ui.formErr?`<div style="color:#ef4444;font-size:12px;margin-top:6px">⚠ ${ui.formErr}</div>`:''}
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
         <span style="color:#334155;font-size:11px">Ctrl+Enter para analisar</span>
         <div style="display:flex;gap:8px">
           <button class="btn-ghost" onclick="hideForm()">Cancelar</button>
-          <button class="btn-primary" onclick="parseForm()" ${ui.formLoading||!ui.formTxt.trim()?'disabled':''}>${ui.formLoading?'<span class="spinner"></span> Analisando...':'⚡ Analisar com IA'}</button>
+          <button class="btn-primary" onclick="parseForm()" ${ui.formLoading||(!ui.formTxt.trim()&&!ui.formImg)?'disabled':''}>${ui.formLoading?'<span class="spinner"></span> Analisando...':'⚡ Analisar com IA'}</button>
         </div>
       </div>`;
   } else {
@@ -471,6 +493,15 @@ function renderForm(RPT){
         <div><label class="label">P&L (${cur()})</label>${inp(f.pnl,"setFD('pnl',this.value)",`-${RPT.toFixed(0)}`,'number')}</div>
         <div><label class="label">RR REALIZADO</label>${inp(f.rr_realizado,"setFD('rr_realizado',this.value)",'1.0','number')}</div>
         <div><label class="label">DATA</label>${inp(f.data,"setFD('data',this.value)",'DD/MM/YYYY')}</div>
+      </div>
+
+      <div style="background:#060d1f;border-radius:8px;padding:12px;border:1px solid #6366f133">
+        <div style="color:#6366f1;font-size:10px;font-weight:700;letter-spacing:0.6px;margin-bottom:9px">📏 PONTOS DA OPERAÇÃO</div>
+        <div class="grid3">
+          <div><label class="label">STOP (pontos)</label><input type="number" value="${escHtml(String(f.pontos_stop||''))}" oninput="setPontos('pontos_stop',this.value)" placeholder="ex: 150"></div>
+          <div><label class="label">ALVO / GAIN (pontos)</label><input type="number" value="${escHtml(String(f.pontos_gain||''))}" oninput="setPontos('pontos_gain',this.value)" placeholder="ex: 450"></div>
+          <div><label class="label">RR PLANEJADO</label><div id="rr-calc" style="color:${rrPlan(f)?'#22c55e':'#334155'};font-weight:700;font-size:16px;padding:8px 0">${rrPlan(f)?`1 : ${rrPlan(f)}`:'—'}</div></div>
+        </div>
       </div>
 
       <div class="grid3">
@@ -545,8 +576,8 @@ function renderTradeDetail(t){
   const fok=allFiltersOk(t);
   const missing=j.filters.filter(x=>!(t.filtros||[]).includes(x));
   return `<div class="trade-detail">
-    <div class="grid4">
-      ${[['TF',t.timeframe||'—'],['RR',t.rr_realizado?`1:${t.rr_realizado}`:'—'],['Parcial',t.saiu_parcial?`Sim ${t.parcial_pct?t.parcial_pct+'%':''}`:'Não'],['Regras',t.seguiu_regras?'Sim ✓':'Não ✗']].map(([l,v])=>`<div style="background:#060d1f;border-radius:8px;padding:8px 10px"><div style="color:#475569;font-size:10px;margin-bottom:2px">${l}</div><div style="color:#f1f5f9;font-size:12px;font-weight:600">${escHtml(String(v))}</div></div>`).join('')}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px">
+      ${[['TF',t.timeframe||'—'],['Stop',t.pontos_stop?`${t.pontos_stop} pts`:'—'],['Alvo',t.pontos_gain?`${t.pontos_gain} pts`:'—'],['RR plan.',rrPlan(t)?`1:${rrPlan(t)}`:'—'],['RR real',t.rr_realizado?`1:${t.rr_realizado}`:'—'],['Parcial',t.saiu_parcial?`Sim ${t.parcial_pct?t.parcial_pct+'%':''}`:'Não'],['Regras',t.seguiu_regras?'Sim ✓':'Não ✗']].map(([l,v])=>`<div style="background:#060d1f;border-radius:8px;padding:8px 10px"><div style="color:#475569;font-size:10px;margin-bottom:2px">${l}</div><div style="color:#f1f5f9;font-size:12px;font-weight:600">${escHtml(String(v))}</div></div>`).join('')}
     </div>
 
     ${j.filters.length?`<div style="background:#060d1f;border-radius:8px;padding:10px 12px;border:1px solid ${fok?'#22c55e33':'#ef444433'}">
@@ -786,6 +817,32 @@ function renderStats(){
     </div>`;
   }
 
+  // ── PONTOS
+  const comPts=j.trades.filter(t=>t.pontos_stop&&t.pontos_gain);
+  if(comPts.length){
+    const avgStop=(comPts.reduce((a,t)=>a+Number(t.pontos_stop),0)/comPts.length).toFixed(0);
+    const avgGain=(comPts.reduce((a,t)=>a+Number(t.pontos_gain),0)/comPts.length).toFixed(0);
+    const avgRRp=(comPts.reduce((a,t)=>a+parseFloat(rrPlan(t)),0)/comPts.length).toFixed(2);
+    html+=`<div class="card"><div class="section-label" style="color:#6366f1">📏 PONTOS DAS OPERAÇÕES (${comPts.length})</div>
+      <div class="grid3">
+        ${[['STOP MÉDIO',`${avgStop} pts`,'#ef4444'],['ALVO MÉDIO',`${avgGain} pts`,'#22c55e'],['RR PLANEJADO MÉDIO',`1 : ${avgRRp}`,'#6366f1']].map(([l,v,col])=>`<div style="background:#060d1f;border-radius:8px;padding:10px 12px"><div style="color:#475569;font-size:10px">${l}</div><div style="color:${col};font-weight:700;font-size:16px">${v}</div></div>`).join('')}
+      </div>`;
+    // faixas de RR
+    const faixas={};
+    comPts.forEach(t=>{
+      const r=parseFloat(rrPlan(t));
+      const k=r<1?'RR < 1':r<2?'RR 1—2':r<3?'RR 2—3':r<4?'RR 3—4':'RR 4+';
+      if(!faixas[k])faixas[k]=[];faixas[k].push(t);
+    });
+    const fr=Object.entries(faixas).map(([label,ts])=>{
+      const w=ts.filter(t=>t.resultado==='Win').length,l=ts.filter(t=>t.resultado==='Loss').length;
+      const p=ts.reduce((s,t)=>s+(t.pnl||0),0);
+      return{label,w,l,p,wr:ts.length?Math.round((w/ts.length)*100):0};
+    }).sort((a,b)=>a.label.localeCompare(b.label));
+    html+=`</div>`;
+    if(fr.length>1)html+=tt('📊 POR FAIXA DE RR PLANEJADO',fr,'#6366f1');
+  }
+
   html+=tt('🧠 POR EMOÇÃO',gs(j.trades,'emocao'));
   html+=tt('⏱ POR TIMEFRAME',gs(j.trades,'timeframe'));
   html+=tt('🕐 POR SESSÃO',gs(j.trades,'sessao'));
@@ -819,12 +876,21 @@ function switchJournal(k){
   ui.formData=emptyForm();save();render();
 }
 function setTab(t){ui.tab=t;render();}
-function showForm(){ui.showForm=true;ui.formMode='texto';ui.formTxt='';ui.formErr='';ui.formData=emptyForm();ui._editIdx=null;render();}
-function hideForm(){ui.showForm=false;ui._editIdx=null;render();}
+function showForm(){ui.showForm=true;ui.formMode='texto';ui.formTxt='';ui.formImg=null;ui.formErr='';ui.formData=emptyForm();ui._editIdx=null;render();}
+function hideForm(){ui.showForm=false;ui.formImg=null;ui._editIdx=null;render();}
 function setFormMode(m){ui.formMode=m;render();}
 function setFormTxt(v){ui.formTxt=v;}
 function setFD(k,v){ui.formData[k]=v;render();}
 function setFDq(k,v){ui.formData[k]=v;}
+function setPontos(k,v){
+  ui.formData[k]=v;
+  const el=document.getElementById('rr-calc');
+  if(el){
+    const r=rrPlan(ui.formData);
+    el.textContent=r?`1 : ${r}`:'—';
+    el.style.color=r?'#22c55e':'#334155';
+  }
+}
 function toggleFD(k){
   if(k==='lt_rompimento_forte')ui.formData[k]=ui.formData[k]===true?false:true;
   else ui.formData[k]=!ui.formData[k];
@@ -867,6 +933,14 @@ function editTrade(i){
   ui.formMode='manual';ui.showForm=true;ui._editIdx=i;ui.formErr='';
   render();window.scrollTo({top:0,behavior:'smooth'});
 }
+function loadFormImg(event){
+  const file=event.target.files[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=e=>{ui.formImg=e.target.result;render();};
+  r.readAsDataURL(file);
+}
+function clearFormImg(){ui.formImg=null;render();}
+
 function loadImage(event){
   const file=event.target.files[0];if(!file)return;
   const r=new FileReader();
@@ -896,10 +970,19 @@ function scanText(txt,valid){
 
 async function parseForm(){
   const txt=ui.formTxt||document.getElementById('formtxt')?.value||'';
-  if(!txt.trim())return;
+  if(!txt.trim()&&!ui.formImg)return;
   ui.formTxt=txt;ui.formLoading=true;ui.formErr='';render();
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1200,system:getPARSE_PROMPT(),messages:[{role:'user',content:txt}]})});
+    let content;
+    if(ui.formImg){
+      const parts=ui.formImg.split(',');
+      const mime=(parts[0].match(/data:(.*?);/)||[])[1]||'image/png';
+      content=[
+        {type:'image',source:{type:'base64',media_type:mime,data:parts[1]}},
+        {type:'text',text:(txt.trim()||'Extraia todos os dados possíveis deste print do relatório de performance.')+'\n\nLeia a imagem com atenção: extraia resultado financeiro, resultado em pontos, preço/horário de abertura e fechamento, ativo, direção e quantidade. Se o print mostrar stop e alvo em pontos, preencha pontos_stop e pontos_gain.'}
+      ];
+    } else { content=txt; }
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1500,system:getPARSE_PROMPT(),messages:[{role:'user',content}]})});
     const d=await res.json();
     const raw=d.content?.map(i=>i.text||'').join('')||'';
     const p=JSON.parse(raw.replace(/```json|```/g,'').trim());
@@ -918,9 +1001,9 @@ async function parseForm(){
     let gt=normList(p.gatilhos||p.gatilho,jj.triggers);
     rg=[...rg,...scanText(txt,jj.regions).filter(x=>!rg.includes(x))];
     gt=[...gt,...scanText(txt,jj.triggers).filter(x=>!gt.includes(x))];
-    ui.formData={...emptyForm(),...p,regioes:rg,gatilhos:gt,filtros:fl,confluencias:cf,bt_confluencias:normList(p.bt_confluencias,FIBO_CONF)};
+    ui.formData={...emptyForm(),...p,regioes:rg,gatilhos:gt,filtros:fl,confluencias:cf,bt_confluencias:normList(p.bt_confluencias,FIBO_CONF),imagem:ui.formImg||null};
     ui.formMode='manual';
-  }catch{ui.formErr='Não consegui interpretar. Tente descrever com mais detalhes.';}
+  }catch(e){ui.formErr=ui.formImg?'Não consegui ler o print. Tente uma imagem mais nítida ou descreva o trade em texto.':'Não consegui interpretar. Tente descrever com mais detalhes.';}
   ui.formLoading=false;render();
 }
 
@@ -928,10 +1011,10 @@ function saveTrade(){
   const f=ui.formData,c=CFG();
   const missing=isLiq()?(!f.par||!(f.regioes||[]).length||!(f.gatilhos||[]).length||!f.resultado):(!f.par||!f.setup||!f.resultado);
   if(missing){ui.formErr=isLiq()?'Preencha: ativo, ao menos uma região, ao menos um gatilho e resultado.':'Preencha: par, setup e resultado.';render();return;}
-  const trade={...f,pnl:Number(f.pnl)||0,rr_realizado:Number(f.rr_realizado)||null,parcial_pct:f.parcial_pct?Number(f.parcial_pct):null};
+  const trade={...f,pnl:Number(f.pnl)||0,rr_realizado:Number(f.rr_realizado)||null,parcial_pct:f.parcial_pct?Number(f.parcial_pct):null,pontos_stop:f.pontos_stop?Number(f.pontos_stop):null,pontos_gain:f.pontos_gain?Number(f.pontos_gain):null};
   if(ui._editIdx!=null){J().trades[ui._editIdx]=trade;ui._editIdx=null;}
   else{J().trades.unshift(trade);}
-  ui.showForm=false;ui.formData=emptyForm();save();render();
+  ui.showForm=false;ui.formImg=null;ui.formData=emptyForm();save();render();
 }
 
 function addItem(key){
@@ -986,6 +1069,7 @@ function openClaude(){
     const fok=allFiltersOk(t);
     if(fok!==null)p.push(fok?'filtros:OK':`filtros:faltou(${j.filters.filter(x=>!(t.filtros||[]).includes(x)).join('/')})`);
     if((t.confluencias||[]).length)p.push(`confl:${t.confluencias.join('+')}`);
+    if(t.pontos_stop&&t.pontos_gain)p.push(`stop:${t.pontos_stop}pts/alvo:${t.pontos_gain}pts(RR1:${rrPlan(t)})`);
     p.push(t.resultado,fmt(t.pnl));
     if(t.saiu_parcial)p.push(`parcial:${t.parcial_pct||'sim'}%`);
     if(t.emocao)p.push(t.emocao);
