@@ -120,7 +120,7 @@ function initJournal(key){
 }
 
 let ui={tab:'journal',showForm:false,
-  filter:{setup:'',resultado:'',par:'',periodo:'',diaSemana:'',regiao:'',gatilho:'',confluencia:'',filtrosOk:''},
+  filter:{setup:'',resultado:'',par:'',periodo:'',diaSemana:'',regiao:'',gatilho:'',confluencias:[],filtros:[],filtrosOk:''},
   formMode:'texto',formTxt:'',formData:null,formLoading:false,formErr:'',openTrades:{},_editIdx:null};
 
 function J(){return journals[activeJournal];}
@@ -232,7 +232,8 @@ function render(){
     if(ui.filter.setup&&t.setup!==ui.filter.setup)return false;
     if(ui.filter.regiao&&t.regiao!==ui.filter.regiao)return false;
     if(ui.filter.gatilho&&t.gatilho!==ui.filter.gatilho)return false;
-    if(ui.filter.confluencia&&!(t.confluencias||[]).includes(ui.filter.confluencia))return false;
+    if(ui.filter.confluencias.length&&!ui.filter.confluencias.every(x=>(t.confluencias||[]).includes(x)))return false;
+    if(ui.filter.filtros.length&&!ui.filter.filtros.every(x=>(t.filtros||[]).includes(x)))return false;
     if(ui.filter.filtrosOk){
       const ok=allFiltersOk(t);
       if(ui.filter.filtrosOk==='sim'&&ok!==true)return false;
@@ -311,16 +312,28 @@ function render(){
       ${isLiq()
         ?`<select onchange="setFilter('regiao',this.value)" style="width:auto"><option value="">Região: Todas</option>${j.regions.map(o=>`<option value="${escHtml(o)}"${ui.filter.regiao===o?'selected':''}>${escHtml(o)}</option>`).join('')}</select>
           <select onchange="setFilter('gatilho',this.value)" style="width:auto"><option value="">Gatilho: Todos</option>${j.triggers.map(o=>`<option value="${escHtml(o)}"${ui.filter.gatilho===o?'selected':''}>${escHtml(o)}</option>`).join('')}</select>
-          <select onchange="setFilter('confluencia',this.value)" style="width:auto"><option value="">Confluência: Todas</option>${j.confluences.map(o=>`<option value="${escHtml(o)}"${ui.filter.confluencia===o?'selected':''}>${escHtml(o)}</option>`).join('')}</select>
           <select onchange="setFilter('filtrosOk',this.value)" style="width:auto"><option value="">Filtros: Todos</option><option value="sim"${ui.filter.filtrosOk==='sim'?' selected':''}>✓ Todos atendidos</option><option value="nao"${ui.filter.filtrosOk==='nao'?' selected':''}>✗ Incompletos</option></select>`
         :`<select onchange="setFilter('setup',this.value)" style="width:auto"><option value="">Setup: Todos</option>${j.setups.map(o=>`<option value="${o}"${ui.filter.setup===o?'selected':''}>${o}</option>`).join('')}</select>`}
       <select onchange="setFilter('resultado',this.value)" style="width:auto"><option value="">Resultado: Todos</option>${j.results.map(o=>`<option value="${o}"${ui.filter.resultado===o?'selected':''}>${o}</option>`).join('')}</select>
       ${j.pairs.length>1?`<select onchange="setFilter('par',this.value)" style="width:auto"><option value="">Ativo: Todos</option>${[...new Set(j.trades.map(t=>t.par).filter(Boolean))].map(o=>`<option value="${o}"${ui.filter.par===o?'selected':''}>${o}</option>`).join('')}</select>`:''}
       <select onchange="setFilter('diaSemana',this.value)" style="width:auto"><option value="">Dia: Todos</option>${WEEKDAYS.map(o=>`<option value="${o}"${ui.filter.diaSemana===o?'selected':''}>${o}</option>`).join('')}</select>
       <select onchange="setFilter('periodo',this.value)" style="width:auto"><option value="">Período: Todos</option>${[['7','7 dias'],['30','30 dias'],['90','90 dias']].map(([v,l])=>`<option value="${v}"${ui.filter.periodo===v?'selected':''}>${l}</option>`).join('')}</select>
-      ${Object.values(ui.filter).some(Boolean)?`<button class="btn-ghost" onclick="clearFilter()" style="font-size:11px">✕ Limpar</button>`:''}
+      ${(Object.entries(ui.filter).some(([k,v])=>Array.isArray(v)?v.length:v))?`<button class="btn-ghost" onclick="clearFilter()" style="font-size:11px">✕ Limpar tudo</button>`:''}
       <span style="color:#334155;font-size:11px">${filtered.length} trade${filtered.length!==1?'s':''}</span>
     </div>`;
+
+    if(isLiq()&&(j.confluences.length||j.filters.length)){
+      html+=`<div style="background:#0d1526;border-radius:10px;padding:12px 14px;border:1px solid #1e3a5f;margin-bottom:14px;display:grid;gap:12px">
+        ${j.confluences.length?`<div>
+          <div style="color:#f59e0b;font-size:10px;font-weight:700;letter-spacing:0.6px;margin-bottom:7px">🔗 FILTRAR POR CONFLUÊNCIAS ${ui.filter.confluencias.length?`— mostrando trades que têm TODAS as ${ui.filter.confluencias.length} marcadas`:'(selecione uma ou mais)'}</div>
+          ${chips(j.confluences,ui.filter.confluencias,'toggleFilterConfl','#f59e0b')}
+        </div>`:''}
+        ${j.filters.length?`<div>
+          <div style="color:#22c55e;font-size:10px;font-weight:700;letter-spacing:0.6px;margin-bottom:7px">✓ FILTRAR POR FILTROS PRESENTES ${ui.filter.filtros.length?`— trades com TODOS os ${ui.filter.filtros.length} marcados`:'(selecione um ou mais)'}</div>
+          ${chips(j.filters,ui.filter.filtros,'toggleFilterFiltro','#22c55e')}
+        </div>`:''}
+      </div>`;
+    }
 
     if(!filtered.length&&!ui.showForm){
       html+=`<div style="text-align:center;padding:48px 24px;color:#334155;background:#0d1526;border-radius:14px;border:1px dashed #1e3a5f">
@@ -783,7 +796,7 @@ function renderStats(){
 // ══════════════════════════════════════════════════════════════════
 function switchJournal(k){
   activeJournal=k;ui.showForm=false;ui.openTrades={};ui._editIdx=null;
-  ui.filter={setup:'',resultado:'',par:'',periodo:'',diaSemana:'',regiao:'',gatilho:'',confluencia:'',filtrosOk:''};
+  ui.filter={setup:'',resultado:'',par:'',periodo:'',diaSemana:'',regiao:'',gatilho:'',confluencias:[],filtros:[],filtrosOk:''};
   ui.formData=emptyForm();save();render();
 }
 function setTab(t){ui.tab=t;render();}
@@ -806,7 +819,14 @@ function toggleFiltro(i){const v=J().filters[i];if(v!==undefined)toggleInList('f
 function toggleConfluencia(i){const v=J().confluences[i];if(v!==undefined)toggleInList('confluencias',v);}
 function toggleConf(i){const v=FIBO_CONF[i];if(v!==undefined)toggleInList('bt_confluencias',v);}
 function setFilter(k,v){ui.filter[k]=v;render();}
-function clearFilter(){ui.filter={setup:'',resultado:'',par:'',periodo:'',diaSemana:'',regiao:'',gatilho:'',confluencia:'',filtrosOk:''};render();}
+function toggleFilterList(field,val){
+  const c=ui.filter[field]||[];
+  ui.filter[field]=c.includes(val)?c.filter(x=>x!==val):[...c,val];
+  render();
+}
+function toggleFilterConfl(i){const v=J().confluences[i];if(v!==undefined)toggleFilterList('confluencias',v);}
+function toggleFilterFiltro(i){const v=J().filters[i];if(v!==undefined)toggleFilterList('filtros',v);}
+function clearFilter(){ui.filter={setup:'',resultado:'',par:'',periodo:'',diaSemana:'',regiao:'',gatilho:'',confluencias:[],filtros:[],filtrosOk:''};render();}
 function toggleTrade(i){ui.openTrades[i]=!ui.openTrades[i];render();}
 function deleteTrade(i){if(confirm('Remover esse trade?')){J().trades.splice(i,1);save();render();}}
 function updateCapital(v){const n=parseFloat(v);if(n>0){J().capital=n;save();render();}}
