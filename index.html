@@ -121,7 +121,7 @@ function initJournal(key){
 
 let ui={tab:'journal',showForm:false,
   filter:{setup:'',resultado:'',par:'',periodo:'',diaSemana:'',regioes:[],gatilhos:[],confluencias:[],filtros:[],filtrosOk:''},
-  formMode:'texto',formTxt:'',formImg:null,formData:null,formLoading:false,formErr:'',openTrades:{},_editIdx:null};
+  formMode:'manual',formTxt:'',formImg:null,formData:null,formLoading:false,formErr:'',openTrades:{},_editIdx:null};
 
 function J(){return journals[activeJournal];}
 function CFG(){return JOURNALS[activeJournal];}
@@ -437,40 +437,10 @@ function render(){
 function renderForm(RPT){
   const f=ui.formData,j=J(),c=CFG();
   let html=`<div class="card" style="margin-bottom:16px">
-    <div style="display:flex;gap:8px;margin-bottom:16px">
-      ${['texto','manual'].map(m=>`<button onclick="setFormMode('${m}')" style="background:${ui.formMode===m?'#6366f1':'transparent'};border:1px solid ${ui.formMode===m?'#6366f1':'#1e3a5f'};border-radius:8px;color:${ui.formMode===m?'#fff':'#64748b'};padding:7px 16px;cursor:pointer;font-size:12px;font-weight:600">${m==='texto'?'✍️ Descrever':'📋 Preencher'}</button>`).join('')}
-    </div>`;
+    <div style="color:#6366f1;font-size:11px;font-weight:700;letter-spacing:0.6px;margin-bottom:14px">📋 ${ui._editIdx!=null?'EDITAR TRADE':'NOVO TRADE'}</div>`;
 
-  if(ui.formMode==='texto'){
-    const ph=isLiq()
-      ?`Descreva o trade:&#10;&#10;&quot;WIN captura de liquidez, pivô oculto no M1, preço esticado, frequência baixa, amplitude alta, indicador barato. POC e VWAP diária como confluência. Compra, win, parcial em 50%&quot;`
-      :`Descreva o trade:&#10;&#10;&quot;Pivot compra EURUSD M5, win, confiante, segui o setup&quot;`;
-    html+=`<textarea id="formtxt" oninput="setFormTxt(this.value)" placeholder="${ph}" style="width:100%;min-height:110px;resize:vertical">${escHtml(ui.formTxt)}</textarea>
+  {
 
-      <div style="margin-top:12px">
-        ${ui.formImg
-          ?`<div style="background:#060d1f;border:1px solid #22c55e44;border-radius:8px;padding:10px">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                <span style="color:#22c55e;font-size:11px;font-weight:700">📷 Print anexado — a IA vai ler os dados da imagem</span>
-                <button onclick="clearFormImg()" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:16px">×</button>
-              </div>
-              <img src="${ui.formImg}" style="max-height:160px;max-width:100%;border-radius:6px;border:1px solid #1e3a5f">
-            </div>`
-          :`<label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#060d1f;border:1px dashed #1e3a5f;border-radius:8px;padding:11px;color:#475569;font-size:13px">
-              <span>📷 Anexar print do relatório de performance (opcional — a IA lê os dados)</span>
-              <input type="file" accept="image/*" onchange="loadFormImg(event)" style="display:none;width:auto">
-            </label>`}
-      </div>
-
-      ${ui.formErr?`<div style="color:#ef4444;font-size:12px;margin-top:6px">⚠ ${ui.formErr}</div>`:''}
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
-        <span style="color:#334155;font-size:11px">Ctrl+Enter para analisar</span>
-        <div style="display:flex;gap:8px">
-          <button class="btn-ghost" onclick="hideForm()">Cancelar</button>
-          <button class="btn-primary" onclick="parseForm()" ${ui.formLoading||(!ui.formTxt.trim()&&!ui.formImg)?'disabled':''}>${ui.formLoading?'<span class="spinner"></span> Analisando...':'⚡ Analisar com IA'}</button>
-        </div>
-      </div>`;
-  } else {
     const fCount=(f.filtros||[]).length, fTotal=j.filters.length;
     const allOk=fTotal>0&&fCount===fTotal;
     html+=`<div style="display:grid;gap:12px">
@@ -558,12 +528,11 @@ function renderForm(RPT){
         <label class="label">📷 PRINT DO GRÁFICO</label>
         ${f.imagem
           ?`<div style="position:relative;display:inline-block"><img src="${f.imagem}" class="img-preview" style="max-height:200px"><button onclick="setFD('imagem',null)" style="position:absolute;top:4px;right:4px;background:#ef4444;border:none;border-radius:50%;width:20px;height:20px;color:#fff;cursor:pointer;font-size:12px;line-height:1">×</button></div>`
-          :`<label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#060d1f;border:1px dashed #1e3a5f;border-radius:8px;padding:12px;color:#475569;font-size:13px"><span>📎 Clique para anexar imagem</span><input type="file" accept="image/*" onchange="loadImage(event)" style="display:none"></label>`}
+          :`<label style="display:flex;align-items:center;gap:8px;cursor:pointer;background:#060d1f;border:1px dashed #1e3a5f;border-radius:8px;padding:12px;color:#475569;font-size:13px"><span>📎 Anexar print do gráfico ou do relatório</span><input type="file" accept="image/*" onchange="loadImage(event)" style="display:none"></label>`}
       </div>
 
       ${ui.formErr?`<div style="color:#ef4444;font-size:12px">⚠ ${ui.formErr}</div>`:''}
       <div style="display:flex;justify-content:flex-end;gap:8px">
-        <button class="btn-ghost" onclick="setFormMode('texto')">← Voltar</button>
         <button class="btn-ghost" onclick="hideForm()">Cancelar</button>
         <button class="btn-primary" onclick="saveTrade()">💾 Salvar Trade</button>
       </div>
@@ -898,7 +867,7 @@ function switchJournal(k){
   ui.formData=emptyForm();save();render();
 }
 function setTab(t){ui.tab=t;render();}
-function showForm(){ui.showForm=true;ui.formMode='texto';ui.formTxt='';ui.formImg=null;ui.formErr='';ui.formData=emptyForm();ui._editIdx=null;render();}
+function showForm(){ui.showForm=true;ui.formMode='manual';ui.formTxt='';ui.formImg=null;ui.formErr='';ui.formData=emptyForm();ui._editIdx=null;render();}
 function hideForm(){ui.showForm=false;ui.formImg=null;ui._editIdx=null;render();}
 function setFormMode(m){ui.formMode=m;render();}
 function setFormTxt(v){ui.formTxt=v;}
@@ -948,13 +917,6 @@ function resetLists(){
   ['pairs','paused','setups','results','timeframes','sessions','regions','triggers','filters','confluences'].forEach(k=>{j[k]=[...d[k]];});
   save();render();
 }
-function setRiskMode(v){J().riskMode=v;save();render();}
-function setCfgVal(k,v){const n=parseFloat(v);if(!isNaN(n))J()[k]=n;save();render();}
-function editTrade(i){
-  ui.formData={...emptyForm(),...J().trades[i]};
-  ui.formMode='manual';ui.showForm=true;ui._editIdx=i;ui.formErr='';
-  render();window.scrollTo({top:0,behavior:'smooth'});
-}
 function loadFormImg(event){
   const file=event.target.files[0];if(!file)return;
   const r=new FileReader();
@@ -970,70 +932,7 @@ function loadImage(event){
   r.readAsDataURL(file);
 }
 
-function normList(raw,valid){
-  if(!raw)return[];
-  let arr=Array.isArray(raw)?raw:String(raw).split(/[,;/|]+|\se\s|\+/);
-  const out=[];
-  arr.forEach(item=>{
-    const t=String(item).trim();
-    if(!t)return;
-    // match exato
-    let hit=valid.find(v=>v.toLowerCase()===t.toLowerCase());
-    // match parcial (contém)
-    if(!hit)hit=valid.find(v=>v.toLowerCase().includes(t.toLowerCase())||t.toLowerCase().includes(v.toLowerCase()));
-    if(hit&&!out.includes(hit))out.push(hit);
-  });
-  return out;
-}
-function scanText(txt,valid){
-  const low=txt.toLowerCase();
-  return valid.filter(v=>low.includes(v.toLowerCase()));
-}
 
-async function parseForm(){
-  const txt=ui.formTxt||document.getElementById('formtxt')?.value||'';
-  if(!txt.trim()&&!ui.formImg)return;
-  ui.formTxt=txt;ui.formLoading=true;ui.formErr='';render();
-  try{
-    let content;
-    if(ui.formImg){
-      const parts=ui.formImg.split(',');
-      const mime=(parts[0].match(/data:(.*?);/)||[])[1]||'image/png';
-      content=[
-        {type:'image',source:{type:'base64',media_type:mime,data:parts[1]}},
-        {type:'text',text:(txt.trim()||'Extraia todos os dados possíveis deste print do relatório de performance.')+'\n\nLeia a imagem com atenção e extraia: ativo, horário de abertura, direção (C=Compra, V=Venda), quantidade, preço de compra, preço de venda, resultado financeiro em R$ e resultado em pontos. Responda APENAS com o JSON, sem texto antes ou depois.'}
-      ];
-    } else { content=txt; }
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1500,system:getPARSE_PROMPT(),messages:[{role:'user',content}]})});
-    const d=await res.json();
-    const raw=d.content?.map(i=>i.text||'').join('')||'';
-    ui._lastRaw=raw;
-    const p=extractJSON(raw);
-    if(!p.data)p.data=today();
-    const R=riskPerTrade();
-    if(!p.pnl&&p.resultado==='Loss')p.pnl=-R;
-    if(!p.pnl&&p.resultado==='Win')p.pnl=p.rr_realizado?R*p.rr_realizado:R;
-    const jj=J();
-    let fl=normList(p.filtros,jj.filters);
-    let cf=normList(p.confluencias,jj.confluences);
-    // fallback: varre o texto original em busca dos termos
-    const extraF=scanText(txt,jj.filters).filter(x=>!fl.includes(x));
-    const extraC=scanText(txt,jj.confluences).filter(x=>!cf.includes(x));
-    fl=[...fl,...extraF];cf=[...cf,...extraC];
-    let rg=normList(p.regioes||p.regiao,jj.regions);
-    let gt=normList(p.gatilhos||p.gatilho,jj.triggers);
-    rg=[...rg,...scanText(txt,jj.regions).filter(x=>!rg.includes(x))];
-    gt=[...gt,...scanText(txt,jj.triggers).filter(x=>!gt.includes(x))];
-    ui.formData={...emptyForm(),...p,regioes:rg,gatilhos:gt,filtros:fl,confluencias:cf,bt_confluencias:normList(p.bt_confluencias,FIBO_CONF),imagem:ui.formImg||null};
-    ui.formMode='manual';
-  }catch(e){
-    console.error('parseForm:',e,ui._lastRaw);
-    ui.formErr=(ui._lastRaw&&ui._lastRaw.length<200)
-      ? 'A IA respondeu: "'+ui._lastRaw.slice(0,160)+'" — tente de novo ou preencha manualmente.'
-      : (ui.formImg?'Não consegui ler o print. Tente de novo, use uma imagem maior/mais nítida, ou preencha manualmente.':'Não consegui interpretar. Tente descrever com mais detalhes.');
-  }
-  ui.formLoading=false;render();
-}
 
 function saveTrade(){
   const f=ui.formData,c=CFG();
