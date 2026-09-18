@@ -201,7 +201,7 @@ function getPARSE_PROMPT(){
 Ativos: ${j.pairs.join(', ')}.
 Extraia o trade descrito e retorne SOMENTE JSON sem markdown:
 {"par":"${j.pairs[0]||''}",${isLiq()?`"regiao":"","gatilho":"","filtros":[],"confluencias":[],"setup":""`:`"setup":"","regiao":"","gatilho":"","filtros":[],"confluencias":[]`},"direcao":"Compra","resultado":"Win","pnl":${riskPerTrade().toFixed(2)},"rr_realizado":1,"saiu_parcial":false,"parcial_pct":null,"fibo_nivel":null,"timeframe":"M1","sessao":"","emocao":"Neutro","seguiu_regras":true,"moveu_be_cedo":false,"tinha_confluencia":true,"erros":null,"acertos":null,"data":"${today()}","notas":null,"resumo_ia":"análise com dica de melhoria","score":7}
-Para "filtros" e "confluencias" use apenas valores exatos das listas acima que foram mencionados.`;
+IMPORTANTE: "filtros" e "confluencias" são ARRAYS. Inclua TODOS os itens mencionados, não apenas um. Exemplo: "filtros":["Preço esticado","Frequência baixa","Amplitude alta"], "confluencias":["POC","VWAP diária"]. Use os textos EXATOS das listas acima. Se nenhum foi mencionado, use [].`;
 }
 
 // ── UI HELPERS ─────────────────────────────────────────────────────
@@ -850,6 +850,26 @@ function loadImage(event){
   r.readAsDataURL(file);
 }
 
+function normList(raw,valid){
+  if(!raw)return[];
+  let arr=Array.isArray(raw)?raw:String(raw).split(/[,;/|]+|\se\s|\+/);
+  const out=[];
+  arr.forEach(item=>{
+    const t=String(item).trim();
+    if(!t)return;
+    // match exato
+    let hit=valid.find(v=>v.toLowerCase()===t.toLowerCase());
+    // match parcial (contém)
+    if(!hit)hit=valid.find(v=>v.toLowerCase().includes(t.toLowerCase())||t.toLowerCase().includes(v.toLowerCase()));
+    if(hit&&!out.includes(hit))out.push(hit);
+  });
+  return out;
+}
+function scanText(txt,valid){
+  const low=txt.toLowerCase();
+  return valid.filter(v=>low.includes(v.toLowerCase()));
+}
+
 async function parseForm(){
   const txt=ui.formTxt||document.getElementById('formtxt')?.value||'';
   if(!txt.trim())return;
@@ -863,7 +883,14 @@ async function parseForm(){
     const R=riskPerTrade();
     if(!p.pnl&&p.resultado==='Loss')p.pnl=-R;
     if(!p.pnl&&p.resultado==='Win')p.pnl=p.rr_realizado?R*p.rr_realizado:R;
-    ui.formData={...emptyForm(),...p,filtros:p.filtros||[],confluencias:p.confluencias||[]};
+    const jj=J();
+    let fl=normList(p.filtros,jj.filters);
+    let cf=normList(p.confluencias,jj.confluences);
+    // fallback: varre o texto original em busca dos termos
+    const extraF=scanText(txt,jj.filters).filter(x=>!fl.includes(x));
+    const extraC=scanText(txt,jj.confluences).filter(x=>!cf.includes(x));
+    fl=[...fl,...extraF];cf=[...cf,...extraC];
+    ui.formData={...emptyForm(),...p,filtros:fl,confluencias:cf,bt_confluencias:normList(p.bt_confluencias,FIBO_CONF)};
     ui.formMode='manual';
   }catch{ui.formErr='Não consegui interpretar. Tente descrever com mais detalhes.';}
   ui.formLoading=false;render();
