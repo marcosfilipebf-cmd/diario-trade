@@ -146,9 +146,12 @@ try{
   }
 }catch{}
 try{const a=localStorage.getItem('zactive');if(a&&JOURNALS[a])activeJournal=a;}catch{}
-// migração: regiao/gatilho (texto) -> regioes/gatilhos (lista)
+// migração: regiao/gatilho (texto) -> regioes/gatilhos (lista) + sinal do P&L
 Object.keys(journals).forEach(k=>{
   (journals[k].trades||[]).forEach(t=>{
+    if(t.resultado==='Loss'&&t.pnl>0)t.pnl=-Math.abs(t.pnl);
+    if(t.resultado==='Win'&&t.pnl<0)t.pnl=Math.abs(t.pnl);
+    if((t.resultado==='BE'||t.resultado==='BE e depois andou')&&t.pnl)t.pnl=0;
     if(t.regiao&&!t.regioes)t.regioes=[t.regiao];
     if(t.gatilho&&!t.gatilhos)t.gatilhos=[t.gatilho];
     if(!t.regioes)t.regioes=[];
@@ -200,6 +203,13 @@ function calcStats(trades){
   return{totalPnl,wins:wins.length,losses:losses.length,winRate:Math.round((wins.length/trades.length)*100),pf,avgRR};
 }
 function rcColor(r){return RC_DEFAULT[r]||'#6366f1';}
+function normPnl(resultado,valor){
+  const n=Math.abs(Number(valor)||0);
+  if(resultado==='Loss')return -n;
+  if(resultado==='Win')return n;
+  if(resultado==='BE'||resultado==='BE e depois andou')return 0;
+  return Number(valor)||0;
+}
 function extractJSON(raw){
   let t=String(raw).replace(/```json|```/g,'').trim();
   try{return JSON.parse(t);}catch{}
@@ -482,7 +492,12 @@ function renderForm(RPT){
 
       <div class="grid4">
         <div><label class="label">DIREÇÃO</label>${sel(f.direcao,['Compra','Venda'],"setFD('direcao',this.value)",'—')}</div>
-        <div><label class="label">P&L (${cur()})</label>${inp(f.pnl,"setFD('pnl',this.value)",`-${RPT.toFixed(0)}`,'number')}</div>
+        <div>
+          <label class="label">P&L (${cur()}) ${f.resultado==='Loss'?'<span style="color:#ef4444">— será salvo negativo</span>':f.resultado==='Win'?'<span style="color:#22c55e">— será salvo positivo</span>':(f.resultado==='BE'||f.resultado==='BE e depois andou')?'<span style="color:#f59e0b">— BE = zero</span>':''}</label>
+          ${(f.resultado==='BE'||f.resultado==='BE e depois andou')
+            ?`<input type="number" value="0" disabled style="opacity:0.5">`
+            :inp(f.pnl,"setFD('pnl',this.value)",RPT.toFixed(0),'number')}
+        </div>
         <div><label class="label">RR REALIZADO</label>${inp(f.rr_realizado,"setFD('rr_realizado',this.value)",'1.0','number')}</div>
         <div><label class="label">DATA</label>${inp(f.data,"setFD('data',this.value)",'DD/MM/YYYY')}</div>
       </div>
@@ -938,7 +953,7 @@ function saveTrade(){
   const f=ui.formData,c=CFG();
   const missing=isLiq()?(!f.par||!(f.regioes||[]).length||!(f.gatilhos||[]).length||!f.resultado):(!f.par||!f.setup||!f.resultado);
   if(missing){ui.formErr=isLiq()?'Preencha: ativo, ao menos uma região, ao menos um gatilho e resultado.':'Preencha: par, setup e resultado.';render();return;}
-  const trade={...f,pnl:Number(f.pnl)||0,rr_realizado:Number(f.rr_realizado)||null,parcial_pct:f.parcial_pct?Number(f.parcial_pct):null,pontos_stop:f.pontos_stop?Number(f.pontos_stop):null,pontos_gain:f.pontos_gain?Number(f.pontos_gain):null};
+  const trade={...f,pnl:normPnl(f.resultado,f.pnl),rr_realizado:Number(f.rr_realizado)||null,parcial_pct:f.parcial_pct?Number(f.parcial_pct):null,pontos_stop:f.pontos_stop?Number(f.pontos_stop):null,pontos_gain:f.pontos_gain?Number(f.pontos_gain):null};
   if(ui._editIdx!=null){J().trades[ui._editIdx]=trade;ui._editIdx=null;}
   else{J().trades.unshift(trade);}
   ui.showForm=false;ui.formImg=null;ui.formData=emptyForm();save();render();
