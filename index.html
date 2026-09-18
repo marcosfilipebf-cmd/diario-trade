@@ -200,6 +200,17 @@ function calcStats(trades){
   return{totalPnl,wins:wins.length,losses:losses.length,winRate:Math.round((wins.length/trades.length)*100),pf,avgRR};
 }
 function rcColor(r){return RC_DEFAULT[r]||'#6366f1';}
+function extractJSON(raw){
+  let t=String(raw).replace(/```json|```/g,'').trim();
+  try{return JSON.parse(t);}catch{}
+  const i=t.indexOf('{'),k=t.lastIndexOf('}');
+  if(i>=0&&k>i){
+    const slice=t.slice(i,k+1);
+    try{return JSON.parse(slice);}catch{}
+    try{return JSON.parse(slice.replace(/,\s*([}\]])/g,'$1'));}catch{}
+  }
+  throw new Error('JSON não encontrado');
+}
 function rrPlan(t){
   const st=parseFloat(t.pontos_stop),gn=parseFloat(t.pontos_gain);
   if(!st||!gn||st<=0)return null;
@@ -213,7 +224,18 @@ function getPARSE_PROMPT(){
     :`\nSetups: ${j.setups.join(', ')}.`;
   return `Você é especialista em análise de trades (${c.name}). Capital ${c.currency}${j.capital}, risco ${c.currency}${riskPerTrade().toFixed(2)}/operação (${j.riskPct}%), máximo ${j.maxConsec} stops no dia ou ${j.maxLossPct}% de perda.${extra}
 Ativos: ${j.pairs.join(', ')}.
-Se receber uma IMAGEM de relatório de performance (Nelogica/Profit/corretora), leia a tabela e extraia os dados da operação. Retorne SOMENTE JSON sem markdown:
+Se receber uma IMAGEM de relatório de performance (Nelogica/Profit/corretora), leia a tabela linha a linha.
+Colunas típicas da Nelogica e como mapear:
+- "Ativo" (ex: WINV25, WINZ25) -> use apenas o código base do ativo (WIN)
+- "Abertura" / "Fechamento" -> horários; use a Abertura para deduzir a sessão (até 11h=Manhã, 11h-15h=Tarde, após 15h=Fechamento; antes da 9h30=Abertura)
+- "Qtd" (ex: "15 C" = 15 contratos na compra, "15 V" = venda) -> "C" significa direcao "Compra", "V" significa "Venda"
+- "Preço Compra" e "Preço Venda" -> preços de entrada e saída
+- "Res. Operação" em R$ -> este é o pnl (mantenha o sinal: valores em vermelho/negativos são prejuízo)
+- "Res. Operação (pts)" ou "Res. Intervalo (%)" com "pts" -> resultado em pontos
+- Se o resultado financeiro for negativo, "resultado" é "Loss"; se positivo, "Win"; se zero, "BE"
+Quando houver resultado em pontos negativo, ele representa os pontos perdidos — coloque esse valor absoluto em "pontos_stop" apenas se for claramente o stop; caso contrário deixe null.
+IMPORTANTE: responda APENAS com o objeto JSON, sem nenhum texto antes ou depois, sem explicação.
+Retorne SOMENTE JSON sem markdown:
 {"par":"${j.pairs[0]||''}",${isLiq()?`"regioes":[],"gatilhos":[],"filtros":[],"confluencias":[],"setup":""`:`"setup":"","regiao":"","gatilho":"","filtros":[],"confluencias":[]`},"direcao":"Compra","resultado":"Win","pnl":${riskPerTrade().toFixed(2)},"rr_realizado":1,"pontos_stop":null,"pontos_gain":null,"saiu_parcial":false,"parcial_pct":null,"fibo_nivel":null,"timeframe":"M1","sessao":"","emocao":"Neutro","seguiu_regras":true,"moveu_be_cedo":false,"tinha_confluencia":true,"erros":null,"acertos":null,"data":"${today()}","notas":null,"resumo_ia":"análise com dica de melhoria","score":7}
 IMPORTANTE: "regioes", "gatilhos", "filtros" e "confluencias" são ARRAYS (um trade pode ter mais de uma região e mais de um gatilho ao mesmo tempo). Inclua TODOS os itens mencionados, não apenas um. Exemplo: "filtros":["Preço esticado","Frequência baixa","Amplitude alta"], "confluencias":["POC","VWAP diária"]. Use os textos EXATOS das listas acima. Se nenhum foi mencionado, use []. Para "pontos_stop" e "pontos_gain" extraia os pontos mencionados (ex: "stop de 150 pontos e alvo de 450" -> pontos_stop:150, pontos_gain:450).`;
 }
@@ -979,13 +1001,14 @@ async function parseForm(){
       const mime=(parts[0].match(/data:(.*?);/)||[])[1]||'image/png';
       content=[
         {type:'image',source:{type:'base64',media_type:mime,data:parts[1]}},
-        {type:'text',text:(txt.trim()||'Extraia todos os dados possíveis deste print do relatório de performance.')+'\n\nLeia a imagem com atenção: extraia resultado financeiro, resultado em pontos, preço/horário de abertura e fechamento, ativo, direção e quantidade. Se o print mostrar stop e alvo em pontos, preencha pontos_stop e pontos_gain.'}
+        {type:'text',text:(txt.trim()||'Extraia todos os dados possíveis deste print do relatório de performance.')+'\n\nLeia a imagem com atenção e extraia: ativo, horário de abertura, direção (C=Compra, V=Venda), quantidade, preço de compra, preço de venda, resultado financeiro em R$ e resultado em pontos. Responda APENAS com o JSON, sem texto antes ou depois.'}
       ];
     } else { content=txt; }
     const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1500,system:getPARSE_PROMPT(),messages:[{role:'user',content}]})});
     const d=await res.json();
     const raw=d.content?.map(i=>i.text||'').join('')||'';
-    const p=JSON.parse(raw.replace(/```json|```/g,'').trim());
+    ui._lastRaw=raw;
+    const p=extractJSON(raw);
     if(!p.data)p.data=today();
     const R=riskPerTrade();
     if(!p.pnl&&p.resultado==='Loss')p.pnl=-R;
@@ -1003,7 +1026,12 @@ async function parseForm(){
     gt=[...gt,...scanText(txt,jj.triggers).filter(x=>!gt.includes(x))];
     ui.formData={...emptyForm(),...p,regioes:rg,gatilhos:gt,filtros:fl,confluencias:cf,bt_confluencias:normList(p.bt_confluencias,FIBO_CONF),imagem:ui.formImg||null};
     ui.formMode='manual';
-  }catch(e){ui.formErr=ui.formImg?'Não consegui ler o print. Tente uma imagem mais nítida ou descreva o trade em texto.':'Não consegui interpretar. Tente descrever com mais detalhes.';}
+  }catch(e){
+    console.error('parseForm:',e,ui._lastRaw);
+    ui.formErr=(ui._lastRaw&&ui._lastRaw.length<200)
+      ? 'A IA respondeu: "'+ui._lastRaw.slice(0,160)+'" — tente de novo ou preencha manualmente.'
+      : (ui.formImg?'Não consegui ler o print. Tente de novo, use uma imagem maior/mais nítida, ou preencha manualmente.':'Não consegui interpretar. Tente descrever com mais detalhes.');
+  }
   ui.formLoading=false;render();
 }
 
