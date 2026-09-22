@@ -21,7 +21,7 @@ input::placeholder,textarea::placeholder{color:#334155}
 .btn-danger:hover{background:#ef444422}
 .tab{background:none;border:none;border-bottom:2px solid transparent;color:#475569;padding:11px 18px;cursor:pointer;font-weight:600;font-size:13px;white-space:nowrap}
 .tab.active{border-bottom-color:#6366f1;color:#6366f1}
-select,input[type=text],input[type=number],input[type=date],textarea{background:#060d1f;border:1px solid #1e3a5f;border-radius:8px;color:#f1f5f9;font-size:13px;padding:8px 10px;outline:none;width:100%;font-family:inherit}
+select,input[type=text],input[type=number],input[type=date],input[type=time],textarea{background:#060d1f;border:1px solid #1e3a5f;border-radius:8px;color:#f1f5f9;font-size:13px;padding:8px 10px;outline:none;width:100%;font-family:inherit}
 select option{background:#0d1526}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
@@ -49,6 +49,16 @@ select option{background:#0d1526}
 .filter-box{background:#060d1f;border-radius:10px;padding:14px;border:1px solid}
 .check-row{display:flex;align-items:center;gap:9px;cursor:pointer;padding:6px 0}
 .checkbox{width:19px;height:19px;border-radius:5px;border:2px solid;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;flex-shrink:0;transition:all 0.15s}
+input[type=time]::-webkit-calendar-picker-indicator{filter:invert(0.6)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr) 1.1fr;gap:6px}
+.cal-cell{background:#0b1220;border:1px solid #1e3a5f;border-radius:9px;min-height:86px;padding:8px;display:flex;flex-direction:column;justify-content:space-between;cursor:default}
+.cal-cell.win{border-color:#22c55e66;background:#052e1655}
+.cal-cell.loss{border-color:#ef444466;background:#2d060655}
+.cal-cell.be{border-color:#f59e0b55}
+.cal-cell.empty{background:transparent;border:none}
+.cal-week{background:#0d1526;border:1px solid #1e3a5f;border-radius:9px;min-height:86px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.mini-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.mini-cell{aspect-ratio:1;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700}
 </style>
 </head>
 <body>
@@ -119,8 +129,9 @@ function initJournal(key){
     maxConsec:d.maxConsec,maxLossPct:d.maxLossPct,riskPct:d.riskPct,riskMode:d.riskMode,fixedStop:d.fixedStop};
 }
 
-let ui={tab:'journal',showForm:false,
-  filter:{setup:'',resultado:'',par:'',periodo:'',diaSemana:'',regioes:[],gatilhos:[],confluencias:[],filtros:[],filtrosOk:''},
+const _now=new Date();
+let ui={tab:'journal',calView:'mes',calMonth:_now.getMonth(),calYear:_now.getFullYear(),showForm:false,
+  filter:{setup:'',resultado:'',par:'',periodo:'',diaSemana:'',janela:'',regioes:[],gatilhos:[],confluencias:[],filtros:[],filtrosOk:''},
   formMode:'manual',formTxt:'',formImg:null,formData:null,formLoading:false,formErr:'',openTrades:{},_editIdx:null};
 
 function J(){return journals[activeJournal];}
@@ -130,7 +141,7 @@ function isLiq(){return CFG().mode==='liquidity';}
 function emptyForm(){
   return {par:'',setup:'',regioes:[],gatilhos:[],direcao:'',resultado:'',pnl:'',rr_realizado:'',
   filtros:[],confluencias:[],
-  pontos_stop:'',pontos_gain:'',saiu_parcial:false,parcial_pct:'',
+  hora_entrada:'',hora_saida:'',janela:'',pontos_stop:'',pontos_gain:'',saiu_parcial:false,parcial_pct:'',
   fibo_nivel:'',timeframe:'',sessao:'',emocao:'',seguiu_regras:true,moveu_be_cedo:false,tinha_confluencia:true,lt_rompimento_forte:null,
   erros:'',acertos:'',data:today(),notas:'',resumo_ia:'',score:null,imagem:null,
   bt_confluencias:[],bt_tinha_lt_choch:false,bt_retestou:false,bt_tipo_retest:'',bt_mm_proxima:false,bt_mm_respeitou:'',bt_candles_ate_alvo:'',bt_lt_forca:'',bt_ate_onde_foi:'',bt_saiu_antes:false,bt_motivo_saiu:'',bt_contexto:''};
@@ -203,6 +214,23 @@ function calcStats(trades){
   return{totalPnl,wins:wins.length,losses:losses.length,winRate:Math.round((wins.length/trades.length)*100),pf,avgRR};
 }
 function rcColor(r){return RC_DEFAULT[r]||'#6366f1';}
+// ── horários / períodos do pregão
+const JANELAS=[
+  {nome:'Pré-abertura',ini:0,fim:539,cor:'#64748b'},
+  {nome:'Abertura (9h)',ini:540,fim:599,cor:'#f59e0b'},
+  {nome:'Abertura das ações (10h)',ini:600,fim:629,cor:'#8b5cf6'},
+  {nome:'Abertura EUA (10h30)',ini:630,fim:689,cor:'#06b6d4'},
+  {nome:'Meio do dia',ini:690,fim:899,cor:'#64748b'},
+  {nome:'Tarde',ini:900,fim:1019,cor:'#6366f1'},
+  {nome:'Fechamento',ini:1020,fim:1439,cor:'#ef4444'},
+];
+function hm2min(h){if(!h)return null;const p=String(h).split(':').map(Number);if(isNaN(p[0]))return null;return p[0]*60+(p[1]||0);}
+function classifyJanela(h){const m=hm2min(h);if(m===null)return'';const j=JANELAS.find(x=>m>=x.ini&&m<=x.fim);return j?j.nome:'';}
+function janelaCor(n){const j=JANELAS.find(x=>x.nome===n);return j?j.cor:'#64748b';}
+function duracao(a,b){const x=hm2min(a),y=hm2min(b);if(x===null||y===null||y<x)return'';const d=y-x;return d<60?`${d} min`:`${Math.floor(d/60)}h${String(d%60).padStart(2,'0')}`;}
+function parseDate(str){const p=String(str||'').split('/').map(Number);if(p.length<3||!p[0]||!p[1]||!p[2])return null;return new Date(p[2],p[1]-1,p[0]);}
+function dkey(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function fmtK(n){const a=Math.abs(n);const sg=n>0?'+':n<0?'-':'';return a>=1000?`${sg}${cur()}${(a/1000).toFixed(1).replace('.',',')} mil`:`${sg}${cur()}${a.toFixed(0)}`;}
 function normPnl(resultado,valor){
   const n=Math.abs(Number(valor)||0);
   if(resultado==='Loss')return -n;
@@ -275,6 +303,7 @@ function render(){
   const MDL=maxDailyLoss(),RPT=riskPerTrade();
 
   const filtered=j.trades.filter(t=>{
+    if(ui._dayFilter&&t.data!==ui._dayFilter)return false;
     if(ui.filter.setup&&t.setup!==ui.filter.setup)return false;
     if(ui.filter.regioes.length&&!ui.filter.regioes.every(x=>(t.regioes||[]).includes(x)))return false;
     if(ui.filter.gatilhos.length&&!ui.filter.gatilhos.every(x=>(t.gatilhos||[]).includes(x)))return false;
@@ -285,6 +314,7 @@ function render(){
       if(ui.filter.filtrosOk==='sim'&&ok!==true)return false;
       if(ui.filter.filtrosOk==='nao'&&ok!==false)return false;
     }
+    if(ui.filter.janela&&t.janela!==ui.filter.janela)return false;
     if(ui.filter.resultado&&t.resultado!==ui.filter.resultado)return false;
     if(ui.filter.par&&t.par!==ui.filter.par)return false;
     if(ui.filter.diaSemana&&weekday(t.data)!==ui.filter.diaSemana)return false;
@@ -341,7 +371,7 @@ function render(){
 
   // ── TABS
   html+=`<div style="background:#080f23;border-bottom:1px solid #1e3a5f;display:flex;overflow-x:auto;margin:0 -20px">
-    ${[['journal','📝 Diário'],['stats','📊 Stats'],['config','⚙️ Config']].map(([id,label])=>`<button class="tab${ui.tab===id?' active':''}" onclick="setTab('${id}')">${label}</button>`).join('')}
+    ${[['journal','📝 Diário'],['calendar','📅 Calendário'],['stats','📊 Stats'],['config','⚙️ Config']].map(([id,label])=>`<button class="tab${ui.tab===id?' active':''}" onclick="setTab('${id}')">${label}</button>`).join('')}
   </div><div style="max-width:900px;margin:0 auto;padding-top:20px">`;
 
   // ══════════ JOURNAL
@@ -358,13 +388,15 @@ function render(){
       ${isLiq()
         ?`<select onchange="setFilter('filtrosOk',this.value)" style="width:auto"><option value="">Filtros: Todos</option><option value="sim"${ui.filter.filtrosOk==='sim'?' selected':''}>✓ Todos atendidos</option><option value="nao"${ui.filter.filtrosOk==='nao'?' selected':''}>✗ Incompletos</option></select>`
         :`<select onchange="setFilter('setup',this.value)" style="width:auto"><option value="">Setup: Todos</option>${j.setups.map(o=>`<option value="${o}"${ui.filter.setup===o?'selected':''}>${o}</option>`).join('')}</select>`}
+      <select onchange="setFilter('janela',this.value)" style="width:auto"><option value="">Horário: Todos</option>${JANELAS.map(x=>`<option value="${escHtml(x.nome)}"${ui.filter.janela===x.nome?' selected':''}>${escHtml(x.nome)}</option>`).join('')}</select>
       <select onchange="setFilter('resultado',this.value)" style="width:auto"><option value="">Resultado: Todos</option>${j.results.map(o=>`<option value="${o}"${ui.filter.resultado===o?'selected':''}>${o}</option>`).join('')}</select>
       ${j.pairs.length>1?`<select onchange="setFilter('par',this.value)" style="width:auto"><option value="">Ativo: Todos</option>${[...new Set(j.trades.map(t=>t.par).filter(Boolean))].map(o=>`<option value="${o}"${ui.filter.par===o?'selected':''}>${o}</option>`).join('')}</select>`:''}
       <select onchange="setFilter('diaSemana',this.value)" style="width:auto"><option value="">Dia: Todos</option>${WEEKDAYS.map(o=>`<option value="${o}"${ui.filter.diaSemana===o?'selected':''}>${o}</option>`).join('')}</select>
       <select onchange="setFilter('periodo',this.value)" style="width:auto"><option value="">Período: Todos</option>${[['7','7 dias'],['30','30 dias'],['90','90 dias']].map(([v,l])=>`<option value="${v}"${ui.filter.periodo===v?'selected':''}>${l}</option>`).join('')}</select>
       ${(Object.entries(ui.filter).some(([k,v])=>Array.isArray(v)?v.length:v))?`<button class="btn-ghost" onclick="clearFilter()" style="font-size:11px">✕ Limpar tudo</button>`:''}
       <span style="color:#334155;font-size:11px">${filtered.length} trade${filtered.length!==1?'s':''}</span>
-    </div>`;
+    </div>
+    ${ui._dayFilter?`<div style="background:#1e3a5f55;border:1px solid #6366f155;border-radius:8px;padding:8px 12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;font-size:12px"><span>📅 Mostrando só o dia <b>${ui._dayFilter}</b></span><button class="btn-ghost" onclick="ui._dayFilter=null;render()" style="font-size:11px;padding:4px 10px">✕ Ver todos</button></div>`:''}`;
 
     if(isLiq()&&(j.confluences.length||j.filters.length||j.regions.length||j.triggers.length)){
       html+=`<div style="background:#0d1526;border-radius:10px;padding:12px 14px;border:1px solid #1e3a5f;margin-bottom:14px;display:grid;gap:12px">
@@ -412,6 +444,7 @@ function render(){
             ${t.direcao?badge(t.direcao,t.direcao==='Compra'?'#22c55e':'#ef4444'):''}
             ${fok===true?badge('Filtros ✓','#22c55e'):fok===false?badge('Filtros ✗','#ef4444'):''}
             ${(t.confluencias||[]).length?badge(`${t.confluencias.length} confl.`,'#f59e0b'):''}
+            ${t.janela?badge(t.janela+(t.hora_entrada?' · '+t.hora_entrada:''),janelaCor(t.janela)):''}
             ${t.pontos_stop&&t.pontos_gain?badge(`${t.pontos_stop}→${t.pontos_gain}pts`,'#6366f1'):''}
             ${t.saiu_parcial?badge(`Parcial ${t.parcial_pct||''}${t.parcial_pct?'%':''}`,'#f59e0b'):''}
             <span style="color:#475569;font-size:11px">${escHtml(t.data||'')}${weekday(t.data)?' · '+weekday(t.data):''}</span>
@@ -432,6 +465,7 @@ function render(){
       </div>`;
     });
   }
+  else if(ui.tab==='calendar'){html+=renderCalendar();}
   else if(ui.tab==='stats'){html+=renderStats();}
   else if(ui.tab==='config'){html+=renderConfig();}
 
@@ -500,6 +534,15 @@ function renderForm(RPT){
         </div>
         <div><label class="label">RR REALIZADO</label>${inp(f.rr_realizado,"setFD('rr_realizado',this.value)",'1.0','number')}</div>
         <div><label class="label">DATA</label>${inp(f.data,"setFD('data',this.value)",'DD/MM/YYYY')}</div>
+      </div>
+
+      <div style="background:#060d1f;border-radius:8px;padding:12px;border:1px solid #06b6d433">
+        <div style="color:#06b6d4;font-size:10px;font-weight:700;letter-spacing:0.6px;margin-bottom:9px">🕐 HORÁRIO DA OPERAÇÃO</div>
+        <div class="grid3">
+          <div><label class="label">ENTRADA</label><input type="time" value="${escHtml(f.hora_entrada||'')}" oninput="setHora('hora_entrada',this.value)"></div>
+          <div><label class="label">SAÍDA</label><input type="time" value="${escHtml(f.hora_saida||'')}" oninput="setHora('hora_saida',this.value)"></div>
+          <div><label class="label">PERÍODO (automático)</label><div id="janela-calc" style="font-weight:700;font-size:13px;padding:9px 0;color:${janelaCor(classifyJanela(f.hora_entrada))}">${classifyJanela(f.hora_entrada)||'—'}${duracao(f.hora_entrada,f.hora_saida)?` <span style="color:#475569;font-weight:400">· ${duracao(f.hora_entrada,f.hora_saida)}</span>`:''}</div></div>
+        </div>
       </div>
 
       <div style="background:#060d1f;border-radius:8px;padding:12px;border:1px solid #6366f133">
@@ -583,7 +626,7 @@ function renderTradeDetail(t){
   const missing=j.filters.filter(x=>!(t.filtros||[]).includes(x));
   return `<div class="trade-detail">
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px">
-      ${[['TF',t.timeframe||'—'],['Stop',t.pontos_stop?`${t.pontos_stop} pts`:'—'],['Alvo',t.pontos_gain?`${t.pontos_gain} pts`:'—'],['RR plan.',rrPlan(t)?`1:${rrPlan(t)}`:'—'],['RR real',t.rr_realizado?`1:${t.rr_realizado}`:'—'],['Parcial',t.saiu_parcial?`Sim ${t.parcial_pct?t.parcial_pct+'%':''}`:'Não'],['Regras',t.seguiu_regras?'Sim ✓':'Não ✗']].map(([l,v])=>`<div style="background:#060d1f;border-radius:8px;padding:8px 10px"><div style="color:#475569;font-size:10px;margin-bottom:2px">${l}</div><div style="color:#f1f5f9;font-size:12px;font-weight:600">${escHtml(String(v))}</div></div>`).join('')}
+      ${[['TF',t.timeframe||'—'],['Entrada',t.hora_entrada||'—'],['Saída',t.hora_saida||'—'],['Duração',duracao(t.hora_entrada,t.hora_saida)||'—'],['Stop',t.pontos_stop?`${t.pontos_stop} pts`:'—'],['Alvo',t.pontos_gain?`${t.pontos_gain} pts`:'—'],['RR plan.',rrPlan(t)?`1:${rrPlan(t)}`:'—'],['RR real',t.rr_realizado?`1:${t.rr_realizado}`:'—'],['Parcial',t.saiu_parcial?`Sim ${t.parcial_pct?t.parcial_pct+'%':''}`:'Não'],['Regras',t.seguiu_regras?'Sim ✓':'Não ✗']].map(([l,v])=>`<div style="background:#060d1f;border-radius:8px;padding:8px 10px"><div style="color:#475569;font-size:10px;margin-bottom:2px">${l}</div><div style="color:#f1f5f9;font-size:12px;font-weight:600">${escHtml(String(v))}</div></div>`).join('')}
     </div>
 
     ${j.filters.length?`<div style="background:#060d1f;border-radius:8px;padding:10px 12px;border:1px solid ${fok?'#22c55e33':'#ef444433'}">
@@ -849,6 +892,7 @@ function renderStats(){
     if(fr.length>1)html+=tt('📊 POR FAIXA DE RR PLANEJADO',fr,'#6366f1');
   }
 
+  html+=tt('🕐 POR PERÍODO DO PREGÃO',gs(j.trades,'janela').sort((a,b)=>JANELAS.findIndex(x=>x.nome===a.label)-JANELAS.findIndex(x=>x.nome===b.label)),'#06b6d4');
   html+=tt('🧠 POR EMOÇÃO',gs(j.trades,'emocao'));
   html+=tt('⏱ POR TIMEFRAME',gs(j.trades,'timeframe'));
   html+=tt('🕐 POR SESSÃO',gs(j.trades,'sessao'));
@@ -873,21 +917,182 @@ function renderStats(){
   return html;
 }
 
+
+// ══════════════════════════════════════════════════════════════════
+// CALENDAR
+// ══════════════════════════════════════════════════════════════════
+const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const DIASEM=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+function dayMap(){
+  const m={};
+  J().trades.forEach(t=>{
+    const d=parseDate(t.data);if(!d)return;
+    const k=dkey(d);
+    if(!m[k])m[k]={pnl:0,n:0,w:0,l:0};
+    m[k].pnl+=Number(t.pnl)||0;m[k].n++;
+    if(t.resultado==='Win')m[k].w++;
+    if(t.resultado==='Loss')m[k].l++;
+  });
+  return m;
+}
+function monthSummary(dm,y,mo){
+  let pnl=0,n=0,w=0,dias=0,verde=0,verm=0,best=null,worst=null;
+  Object.entries(dm).forEach(([k,v])=>{
+    const [yy,mm,dd]=k.split('-').map(Number);
+    if(yy!==y||mm-1!==mo)return;
+    pnl+=v.pnl;n+=v.n;w+=v.w;dias++;
+    if(v.pnl>0)verde++;else if(v.pnl<0)verm++;
+    const date=new Date(yy,mm-1,dd);
+    if(!best||v.pnl>best.pnl)best={pnl:v.pnl,date};
+    if(!worst||v.pnl<worst.pnl)worst={pnl:v.pnl,date};
+  });
+  return{pnl,n,w,dias,verde,verm,best,worst,wr:n?Math.round(w/n*100):0};
+}
+function calNav(dir){
+  if(ui.calView==='ano'){ui.calYear+=dir;}
+  else{ui.calMonth+=dir;if(ui.calMonth<0){ui.calMonth=11;ui.calYear--;}if(ui.calMonth>11){ui.calMonth=0;ui.calYear++;}}
+  render();
+}
+function calSetView(v){ui.calView=v;render();}
+function calOpenMonth(m){ui.calMonth=m;ui.calView='mes';render();}
+function calOpenDay(k){
+  const [y,m,d]=k.split('-');
+  ui.tab='journal';
+  ui.filter.periodo='';
+  ui._dayFilter=`${d}/${m}/${y}`;
+  render();
+}
+function fmtDia(date){return `${['domingo','segunda','terça','quarta','quinta','sexta','sábado'][date.getDay()]}-feira, ${date.getDate()}`.replace('domingo-feira','domingo').replace('sábado-feira','sábado');}
+
+function renderCalendar(){
+  const dm=dayMap(),y=ui.calYear,mo=ui.calMonth;
+  let html=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+    <div class="journal-switch">
+      <button class="journal-btn${ui.calView==='mes'?' active':''}" onclick="calSetView('mes')">Mês</button>
+      <button class="journal-btn${ui.calView==='ano'?' active':''}" onclick="calSetView('ano')">Ano</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px">
+      <button class="btn-ghost" onclick="calNav(-1)">‹ Anterior</button>
+      <div style="font-weight:800;font-size:18px;min-width:150px;text-align:center">${ui.calView==='ano'?y:`${MESES[mo]} ${y}`}</div>
+      <button class="btn-ghost" onclick="calNav(1)">Próximo ›</button>
+    </div>
+  </div>`;
+
+  if(ui.calView==='mes'){
+    // ── resumo do mês
+    const S=monthSummary(dm,y,mo);
+    const pm=mo===0?11:mo-1,py=mo===0?y-1:y;
+    const P=monthSummary(dm,py,pm);
+    const diff=S.pnl-P.pnl;
+    html+=`<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="color:#475569;font-size:10px;font-weight:700;letter-spacing:0.8px">RESULTADO DO MÊS</div>
+          <div style="font-weight:800;font-size:15px;margin-top:2px">${MESES[mo]} ${y}</div>
+        </div>
+        ${P.dias?`<span class="badge" style="background:${diff>=0?'#22c55e22':'#ef444422'};color:${diff>=0?'#22c55e':'#ef4444'};border:1px solid ${diff>=0?'#22c55e44':'#ef444444'};font-size:12px;padding:4px 10px">${diff>=0?'↗':'↘'} ${diff>=0?'+':''}${fmt(diff)} vs ${MESES[pm].toLowerCase()}</span>`:''}
+      </div>
+      <div style="font-weight:800;font-size:34px;margin:6px 0 2px;color:${S.pnl>0?'#22c55e':S.pnl<0?'#ef4444':'#f1f5f9'}">${S.pnl>0?'+':''}${fmt(S.pnl)}</div>
+      <div style="color:#64748b;font-size:13px">${S.n} trade${S.n!==1?'s':''} em ${S.dias} dia${S.dias!==1?'s':''} operado${S.dias!==1?'s':''}</div>
+      ${S.dias?`<div style="border-top:1px solid #1e3a5f;margin-top:14px;padding-top:12px;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">
+        <div><div style="color:#475569;font-size:10px;font-weight:700">ACERTO</div><div style="font-weight:700;font-size:18px">${S.wr}%</div><div style="color:#475569;font-size:11px">${S.w} de ${S.n} trades</div></div>
+        <div><div style="color:#475569;font-size:10px;font-weight:700">DIAS NO VERDE</div><div style="font-weight:700;font-size:18px">${S.verde}</div><div style="color:#475569;font-size:11px">contra ${S.verm} no vermelho</div></div>
+        <div><div style="color:#475569;font-size:10px;font-weight:700">MELHOR DIA</div><div style="font-weight:700;font-size:18px;color:#22c55e">${S.best&&S.best.pnl>0?'+':''}${fmt(S.best?S.best.pnl:0)}</div><div style="color:#475569;font-size:11px">${S.best?fmtDia(S.best.date):'—'}</div></div>
+        <div><div style="color:#475569;font-size:10px;font-weight:700">PIOR DIA</div><div style="font-weight:700;font-size:18px;color:${S.worst&&S.worst.pnl<0?'#ef4444':'#f1f5f9'}">${fmt(S.worst?S.worst.pnl:0)}</div><div style="color:#475569;font-size:11px">${S.worst?fmtDia(S.worst.date):'—'}</div></div>
+      </div>`:''}
+    </div>`;
+
+    // ── grade
+    const first=new Date(y,mo,1).getDay();
+    const nd=new Date(y,mo+1,0).getDate();
+    html+=`<div class="card"><div class="cal-grid">
+      ${DIASEM.map(d=>`<div style="text-align:center;color:#475569;font-size:10px;font-weight:700;padding-bottom:4px">${d}</div>`).join('')}
+      <div style="text-align:center;color:#22c55e;font-size:10px;font-weight:700;padding-bottom:4px">Semana</div>`;
+    let day=1-first;
+    while(day<=nd){
+      let wk={pnl:0,n:0,has:false};
+      for(let c=0;c<7;c++,day++){
+        if(day<1||day>nd){html+=`<div class="cal-cell empty"></div>`;continue;}
+        const k=dkey(new Date(y,mo,day));
+        const v=dm[k];
+        if(v){wk.pnl+=v.pnl;wk.n+=v.n;wk.has=true;}
+        const cls=!v?'':v.pnl>0?'win':v.pnl<0?'loss':'be';
+        const col=!v?'':v.pnl>0?'#22c55e':v.pnl<0?'#ef4444':'#f59e0b';
+        html+=`<div class="cal-cell ${cls}" ${v?`onclick="calOpenDay('${k}')" style="cursor:pointer" title="Ver trades do dia"`:''}>
+          <div style="display:flex;align-items:center;gap:5px;font-weight:700;font-size:14px;color:${v?'#f1f5f9':'#475569'}">${day}${v?`<span style="width:6px;height:6px;border-radius:50%;background:${col}"></span>`:''}</div>
+          ${v?`<div style="text-align:right"><div style="color:${col};font-weight:800;font-size:13px">${fmtK(v.pnl)}</div><div style="color:#475569;font-size:9px">${v.n}T · ${v.w}W</div></div>`:''}
+        </div>`;
+      }
+      html+=`<div class="cal-week">${wk.has
+        ?`<div style="color:${wk.pnl>0?'#22c55e':wk.pnl<0?'#ef4444':'#f59e0b'};font-weight:800;font-size:13px">${fmtK(wk.pnl)}</div><div style="color:#475569;font-size:9px">${wk.n}T</div>`
+        :`<div style="color:#334155">—</div>`}</div>`;
+    }
+    html+=`</div><div style="color:#475569;font-size:11px;margin-top:10px">Clique num dia para ver os trades dele.</div></div>`;
+  }
+
+  else{
+    // ── visão anual
+    let yp=0,yn=0,yw=0,ydias=0;
+    const cards=MESES.map((nome,m)=>{
+      const S=monthSummary(dm,y,m);
+      yp+=S.pnl;yn+=S.n;yw+=S.w;ydias+=S.dias;
+      const first=new Date(y,m,1).getDay(),nd=new Date(y,m+1,0).getDate();
+      let cells='';
+      DIASEM.forEach(d=>cells+=`<div style="text-align:center;color:#334155;font-size:8px;font-weight:700">${d[0]}</div>`);
+      for(let i=0;i<first;i++)cells+=`<div></div>`;
+      for(let d=1;d<=nd;d++){
+        const v=dm[dkey(new Date(y,m,d))];
+        const bg=!v?'transparent':v.pnl>0?'#22c55e':v.pnl<0?'#ef4444':'#f59e0b';
+        cells+=`<div class="mini-cell" style="background:${bg};color:${v?'#060d1f':'#334155'}">${d}</div>`;
+      }
+      return `<div class="card" style="cursor:pointer;margin:0" onclick="calOpenMonth(${m})">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div style="font-weight:800">${nome}</div>
+          <div style="font-weight:700;font-size:13px;color:${S.pnl>0?'#22c55e':S.pnl<0?'#ef4444':'#334155'}">${S.dias?(S.pnl>0?'+':'')+fmt(S.pnl):'—'}</div>
+        </div>
+        <div class="mini-grid">${cells}</div>
+        <div style="border-top:1px solid #1e3a5f;margin-top:10px;padding-top:8px;display:grid;grid-template-columns:1fr 1fr 1fr;text-align:center">
+          <div><div style="font-weight:700">${S.n}</div><div style="color:#475569;font-size:9px">Trades</div></div>
+          <div><div style="font-weight:700">${S.n?S.wr+'%':'—'}</div><div style="color:#475569;font-size:9px">Win Rate</div></div>
+          <div><div style="font-weight:700">${S.dias}</div><div style="color:#475569;font-size:9px">Dias</div></div>
+        </div>
+      </div>`;
+    });
+    html+=`<div class="card">
+      <div style="color:#475569;font-size:10px;font-weight:700;letter-spacing:0.8px">RESULTADO DO ANO</div>
+      <div style="font-weight:800;font-size:30px;margin:4px 0;color:${yp>0?'#22c55e':yp<0?'#ef4444':'#f1f5f9'}">${yp>0?'+':''}${fmt(yp)}</div>
+      <div style="color:#64748b;font-size:13px">${yn} trades em ${ydias} dias operados · acerto ${yn?Math.round(yw/yn*100):0}%</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px">${cards.join('')}</div>`;
+  }
+  return html;
+}
+
 // ══════════════════════════════════════════════════════════════════
 // ACTIONS
 // ══════════════════════════════════════════════════════════════════
 function switchJournal(k){
   activeJournal=k;ui.showForm=false;ui.openTrades={};ui._editIdx=null;
-  ui.filter={setup:'',resultado:'',par:'',periodo:'',diaSemana:'',regioes:[],gatilhos:[],confluencias:[],filtros:[],filtrosOk:''};
+  ui.filter={setup:'',resultado:'',par:'',periodo:'',diaSemana:'',janela:'',regioes:[],gatilhos:[],confluencias:[],filtros:[],filtrosOk:''};
   ui.formData=emptyForm();save();render();
 }
-function setTab(t){ui.tab=t;render();}
+function setTab(t){ui.tab=t;if(t!=='journal')ui._dayFilter=null;render();}
 function showForm(){ui.showForm=true;ui.formMode='manual';ui.formTxt='';ui.formImg=null;ui.formErr='';ui.formData=emptyForm();ui._editIdx=null;render();}
 function hideForm(){ui.showForm=false;ui.formImg=null;ui._editIdx=null;render();}
 function setFormMode(m){ui.formMode=m;render();}
 function setFormTxt(v){ui.formTxt=v;}
 function setFD(k,v){ui.formData[k]=v;render();}
 function setFDq(k,v){ui.formData[k]=v;}
+function setHora(k,v){
+  ui.formData[k]=v;
+  const el=document.getElementById('janela-calc');
+  if(el){
+    const n=classifyJanela(ui.formData.hora_entrada);
+    const d=duracao(ui.formData.hora_entrada,ui.formData.hora_saida);
+    el.style.color=janelaCor(n);
+    el.innerHTML=(n||'—')+(d?` <span style="color:#475569;font-weight:400">· ${d}</span>`:'');
+  }
+}
 function setPontos(k,v){
   ui.formData[k]=v;
   const el=document.getElementById('rr-calc');
@@ -922,7 +1127,7 @@ function toggleFilterConfl(i){const v=J().confluences[i];if(v!==undefined)toggle
 function toggleFilterRegiao(i){const v=J().regions[i];if(v!==undefined)toggleFilterList('regioes',v);}
 function toggleFilterGatilho(i){const v=J().triggers[i];if(v!==undefined)toggleFilterList('gatilhos',v);}
 function toggleFilterFiltro(i){const v=J().filters[i];if(v!==undefined)toggleFilterList('filtros',v);}
-function clearFilter(){ui.filter={setup:'',resultado:'',par:'',periodo:'',diaSemana:'',regioes:[],gatilhos:[],confluencias:[],filtros:[],filtrosOk:''};render();}
+function clearFilter(){ui._dayFilter=null;ui.filter={setup:'',resultado:'',par:'',periodo:'',diaSemana:'',janela:'',regioes:[],gatilhos:[],confluencias:[],filtros:[],filtrosOk:''};render();}
 function toggleTrade(i){ui.openTrades[i]=!ui.openTrades[i];render();}
 function deleteTrade(i){if(confirm('Remover esse trade?')){J().trades.splice(i,1);save();render();}}
 function updateCapital(v){const n=parseFloat(v);if(n>0){J().capital=n;save();render();}}
@@ -953,7 +1158,7 @@ function saveTrade(){
   const f=ui.formData,c=CFG();
   const missing=isLiq()?(!f.par||!(f.regioes||[]).length||!(f.gatilhos||[]).length||!f.resultado):(!f.par||!f.setup||!f.resultado);
   if(missing){ui.formErr=isLiq()?'Preencha: ativo, ao menos uma região, ao menos um gatilho e resultado.':'Preencha: par, setup e resultado.';render();return;}
-  const trade={...f,pnl:normPnl(f.resultado,f.pnl),rr_realizado:Number(f.rr_realizado)||null,parcial_pct:f.parcial_pct?Number(f.parcial_pct):null,pontos_stop:f.pontos_stop?Number(f.pontos_stop):null,pontos_gain:f.pontos_gain?Number(f.pontos_gain):null};
+  const trade={...f,janela:classifyJanela(f.hora_entrada)||f.janela||'',pnl:normPnl(f.resultado,f.pnl),rr_realizado:Number(f.rr_realizado)||null,parcial_pct:f.parcial_pct?Number(f.parcial_pct):null,pontos_stop:f.pontos_stop?Number(f.pontos_stop):null,pontos_gain:f.pontos_gain?Number(f.pontos_gain):null};
   if(ui._editIdx!=null){J().trades[ui._editIdx]=trade;ui._editIdx=null;}
   else{J().trades.unshift(trade);}
   ui.showForm=false;ui.formImg=null;ui.formData=emptyForm();save();render();
@@ -1011,6 +1216,7 @@ function openClaude(){
     const fok=allFiltersOk(t);
     if(fok!==null)p.push(fok?'filtros:OK':`filtros:faltou(${j.filters.filter(x=>!(t.filtros||[]).includes(x)).join('/')})`);
     if((t.confluencias||[]).length)p.push(`confl:${t.confluencias.join('+')}`);
+    if(t.janela)p.push(`${t.janela}${t.hora_entrada?' '+t.hora_entrada:''}${duracao(t.hora_entrada,t.hora_saida)?' ('+duracao(t.hora_entrada,t.hora_saida)+')':''}`);
     if(t.pontos_stop&&t.pontos_gain)p.push(`stop:${t.pontos_stop}pts/alvo:${t.pontos_gain}pts(RR1:${rrPlan(t)})`);
     p.push(t.resultado,fmt(t.pnl));
     if(t.saiu_parcial)p.push(`parcial:${t.parcial_pct||'sim'}%`);
