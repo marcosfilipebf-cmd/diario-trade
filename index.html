@@ -157,7 +157,7 @@ function initJournal(key){
 
 const _now=new Date();
 let imp=null;
-let ui={tab:'journal',sbOpen:false,calView:'mes',calMonth:_now.getMonth(),calYear:_now.getFullYear(),showForm:false,
+let ui={tab:'journal',sbOpen:false,eqEscala:'trade',eqPeriodo:'',calView:'mes',calMonth:_now.getMonth(),calYear:_now.getFullYear(),showForm:false,
   filter:{setup:'',resultado:'',par:'',periodo:'',diaSemana:'',janela:'',revisar:'',dataPreset:'',dataIni:'',dataFim:'',mesRef:'',regioes:[],gatilhos:[],confluencias:[],filtros:[],filtrosOk:''},
   formMode:'manual',formTxt:'',formImg:null,formData:null,formLoading:false,formErr:'',openTrades:{},_editIdx:null};
 
@@ -386,6 +386,7 @@ function render(){
     {id:'journal',ic:'📝',label:'Diário',badge:nRev||null},
     {id:'calendar',ic:'📅',label:'Calendário'},
     {sec:'ANÁLISE'},
+    {id:'equity',ic:'📈',label:'Curva de equity'},
     {id:'stats',ic:'📊',label:'Análise'},
     {sec:'CONTA'},
     {id:'config',ic:'⚙️',label:'Configurações'},
@@ -393,6 +394,7 @@ function render(){
   const PAGES={
     journal:['Diário','Registre e revise cada operação'],
     calendar:['Calendário','Visualize seu desempenho diário e semanal'],
+    equity:['Curva de equity','Evolução do resultado acumulado e drawdown'],
     stats:['Análise','Recortes e padrões das suas operações'],
     config:['Configurações','Listas, gestão de risco e dados'],
   };
@@ -431,6 +433,16 @@ function render(){
       <div class="page-sub">${psub}</div>
     </div>
 
+    ${ui._backupPend?`<div style="background:#0b1a10;border:1px solid #22c55e55;border-radius:11px;padding:13px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div>
+        <div style="color:#22c55e;font-weight:700;font-size:13.5px">💾 Hora do backup semanal</div>
+        <div style="color:#9aa3ad;font-size:12px;margin-top:2px">Faz uma semana desde o último. Baixe o arquivo e guarde num drive — se o navegador limpar os dados, é ele que salva seu histórico.</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-shrink:0">
+        <button class="btn-ghost" onclick="adiarBackup()" style="font-size:11.5px">Depois</button>
+        <button class="btn-primary" onclick="fazerBackupAuto()" style="padding:8px 16px;font-size:12.5px">Baixar backup</button>
+      </div>
+    </div>`:''}
     <div class="stats-bar">
       ${[
         ['P&L Total',fmt(stats?.totalPnl??0),(stats?.totalPnl??0)>=0?'#22c55e':'#ef4444'],
@@ -500,7 +512,10 @@ function render(){
       </div>`;})():''}
     ${j.trades.some(t=>t.importado&&!t.revisado)&&!ui.showForm?`<div style="background:#1a1204;border:1px solid #f59e0b44;border-radius:10px;padding:11px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
       <span style="color:#f59e0b;font-size:12.5px">⚠ ${j.trades.filter(t=>t.importado&&!t.revisado).length} trade(s) importado(s) ainda sem região, gatilho, filtros e emoção. Clique em <b>✏️ Editar</b> no card para completar.</span>
-      ${ui.filter.revisar!=='sim'?`<button class="btn-ghost" onclick="setFilter('revisar','sim')" style="font-size:11.5px;padding:5px 11px">Ver só os pendentes</button>`:''}
+      <div style="display:flex;gap:7px;flex-shrink:0">
+        ${ui.filter.revisar!=='sim'?`<button class="btn-ghost" onclick="setFilter('revisar','sim')" style="font-size:11.5px;padding:5px 11px">Ver só os pendentes</button>`:''}
+        <button class="btn-primary" onclick="iniciarRevisao()" style="font-size:11.5px;padding:6px 13px">▶ Revisar em sequência</button>
+      </div>
     </div>`:''}
     ${ui._dayFilter?`<div style="background:#1e3a5f55;border:1px solid #22c55e55;border-radius:8px;padding:8px 12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;font-size:12px"><span>📅 Mostrando só o dia <b>${ui._dayFilter}</b></span><button class="btn-ghost" onclick="ui._dayFilter=null;render()" style="font-size:11px;padding:4px 10px">✕ Ver todos</button></div>`:''}`;
 
@@ -573,6 +588,7 @@ function render(){
     });
   }
   else if(ui.tab==='calendar'){html+=renderCalendar();}
+  else if(ui.tab==='equity'){html+=renderEquity();}
   else if(ui.tab==='stats'){html+=renderStats();}
   else if(ui.tab==='config'){html+=renderConfig();}
 
@@ -588,7 +604,21 @@ function render(){
 // ── FORM ───────────────────────────────────────────────────────────
 function renderForm(RPT){
   const f=ui.formData,j=J(),c=CFG();
+  const pend=pendentes();
+  const posRev=ui._revisao?pend.indexOf(ui._editIdx):-1;
+  const totalRev=ui._revisao?pend.length+(posRev<0?0:0):0;
   let html=`<div class="card" style="margin-bottom:16px">
+    ${ui._revisao?`<div style="background:#1a1204;border:1px solid #f59e0b44;border-radius:9px;padding:11px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <div>
+        <div style="color:#f59e0b;font-weight:700;font-size:12.5px">Revisão guiada — faltam ${pend.length} trade${pend.length!==1?'s':''}</div>
+        <div style="color:#9aa3ad;font-size:11.5px;margin-top:2px">${escHtml(ui.formData.data||'')} · ${escHtml(ui.formData.hora_entrada||'')} · ${escHtml(ui.formData.par||'')} · ${escHtml(ui.formData.resultado||'')} ${fmt(ui.formData.pnl)}</div>
+      </div>
+      <div style="display:flex;gap:7px;flex-shrink:0">
+        <button class="btn-ghost" onclick="pularRevisao(-1)" style="font-size:11.5px;padding:6px 11px">‹ Anterior</button>
+        <button class="btn-ghost" onclick="pularRevisao(1)" style="font-size:11.5px;padding:6px 11px">Pular ›</button>
+        <button class="btn-ghost" onclick="sairRevisao()" style="font-size:11.5px;padding:6px 11px">Sair</button>
+      </div>
+    </div>`:''}
     <div style="color:#22c55e;font-size:11px;font-weight:700;letter-spacing:0.6px;margin-bottom:14px">📋 ${ui._editIdx!=null?'EDITAR TRADE':'NOVO TRADE'}</div>`;
 
   {
@@ -714,7 +744,7 @@ function renderForm(RPT){
       ${ui.formErr?`<div style="color:#ef4444;font-size:12px">⚠ ${ui.formErr}</div>`:''}
       <div style="display:flex;justify-content:flex-end;gap:8px">
         <button class="btn-ghost" onclick="hideForm()">Cancelar</button>
-        <button class="btn-primary" onclick="saveTrade()">💾 Salvar Trade</button>
+        <button class="btn-primary" onclick="saveTrade()">💾 ${ui._revisao&&pendentes().length>1?'Salvar e ir para o próximo':'Salvar Trade'}</button>
       </div>
     </div>`;
   }
@@ -845,6 +875,23 @@ function renderConfig(){
           <div style="color:#475569;font-size:11px;margin-top:4px">= ${fmt(maxDailyLoss())}</div>
         </div>
       </div>
+    </div>
+
+    <div class="card">
+      <div class="section-label" style="color:#22c55e">💾 BACKUP</div>
+      ${(()=>{const cb=lerCfgBackup();const u=cb.ultimo?new Date(cb.ultimo):null;
+        const dias=u?Math.floor((Date.now()-cb.ultimo)/86400000):null;
+        return `<div style="color:#9aa3ad;font-size:12px;line-height:1.7;margin-bottom:11px">
+          Seus trades ficam guardados apenas neste navegador. Limpar os dados de navegação apaga tudo.
+          O backup baixa um arquivo com os dois diários — guarde num drive ou no e-mail.
+        </div>
+        <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:11px">
+          ${toggle(cb.ativo!==false,'toggleBackupAuto()','Lembrar a cada 7 dias')}
+          <span style="color:${dias===null?'#f59e0b':dias>=7?'#f59e0b':'#4b5563'};font-size:12px">
+            ${u?`Último: ${u.toLocaleDateString('pt-BR')} (${dias} dia${dias!==1?'s':''} atrás)`:'Nenhum backup feito ainda'}
+          </span>
+        </div>
+        <button class="btn-primary" onclick="exportJ()" style="padding:9px 16px;font-size:12.5px">📤 Baixar backup agora</button>`;})()}
     </div>
 
     <div class="card">
@@ -1095,6 +1142,149 @@ function renderStats(){
 
   return html;
 }
+
+// ══════════════════════════════════════════════════════════════════
+// CURVA DE EQUITY
+// ══════════════════════════════════════════════════════════════════
+function serieEquity(trades,porDia){
+  const ord=[...trades].filter(t=>parseDate(t.data)).sort((a,b)=>{
+    const d=parseDate(a.data)-parseDate(b.data);
+    if(d)return d;
+    return String(a.hora_entrada||'').localeCompare(String(b.hora_entrada||''));
+  });
+  let acc=0,pico=0;
+  const pts=[];
+  if(porDia){
+    const dias={};
+    ord.forEach(t=>{const k=dkey(parseDate(t.data));(dias[k]=dias[k]||[]).push(t);});
+    Object.keys(dias).sort().forEach(k=>{
+      acc+=dias[k].reduce((a,t)=>a+(t.pnl||0),0);
+      pico=Math.max(pico,acc);
+      pts.push({rot:k.split('-').reverse().slice(0,2).join('/'),acc,dd:acc-pico,n:dias[k].length});
+    });
+  } else {
+    ord.forEach((t,i)=>{
+      acc+=(t.pnl||0);
+      pico=Math.max(pico,acc);
+      pts.push({rot:`#${i+1}`,acc,dd:acc-pico,data:t.data,n:1});
+    });
+  }
+  return pts;
+}
+
+function renderEquity(){
+  const j=J();
+  const T=j.trades.filter(t=>{
+    if(!ui.eqPeriodo)return true;
+    const d=parseDate(t.data);if(!d)return false;
+    const hoje=new Date();hoje.setHours(0,0,0,0);
+    if(ui.eqPeriodo==='mes')return d.getMonth()===hoje.getMonth()&&d.getFullYear()===hoje.getFullYear();
+    if(ui.eqPeriodo==='ano')return d.getFullYear()===hoje.getFullYear();
+    const c=new Date(hoje);c.setDate(c.getDate()-parseInt(ui.eqPeriodo));
+    return d>=c;
+  });
+  if(T.length<2)return `<div style="text-align:center;padding:48px;color:#374151"><div style="font-size:36px;margin-bottom:10px">📈</div>Registre pelo menos 2 operações para desenhar a curva</div>`;
+
+  const porDia=ui.eqEscala==='dia';
+  const pts=serieEquity(T,porDia);
+  const vals=pts.map(p=>p.acc);
+  const maxV=Math.max(...vals,0), minV=Math.min(...vals,0);
+  const span=(maxV-minV)||1;
+  const W=1000,H=280,PL=8,PR=8,PT=14,PB=22;
+  const iw=W-PL-PR, ih=H-PT-PB;
+  const X=i=>PL+(pts.length===1?iw/2:i*iw/(pts.length-1));
+  const Y=v=>PT+ih-((v-minV)/span)*ih;
+  const y0=Y(0);
+
+  const linha=pts.map((p,i)=>`${i?'L':'M'}${X(i).toFixed(1)},${Y(p.acc).toFixed(1)}`).join(' ');
+  const area=`${linha} L${X(pts.length-1).toFixed(1)},${y0.toFixed(1)} L${X(0).toFixed(1)},${y0.toFixed(1)} Z`;
+
+  // drawdown
+  const ddMin=Math.min(...pts.map(p=>p.dd));
+  const ddSpan=Math.abs(ddMin)||1;
+  const DH=70;
+  const ddPath=pts.map((p,i)=>`${i?'L':'M'}${X(i).toFixed(1)},${(6+(Math.abs(p.dd)/ddSpan)*(DH-12)).toFixed(1)}`).join(' ');
+
+  // métricas
+  const fim=pts[pts.length-1].acc;
+  const picoMax=Math.max(...pts.map((p,i)=>Math.max(...pts.slice(0,i+1).map(x=>x.acc))));
+  const ddPctPico=picoMax>0?Math.abs(ddMin)/picoMax*100:0;
+  let seqW=0,seqL=0,bw=0,bl=0;
+  [...T].sort((a,b)=>parseDate(a.data)-parseDate(b.data)).forEach(t=>{
+    if(t.resultado==='Win'){seqW++;seqL=0;bw=Math.max(bw,seqW);}
+    else if(t.resultado==='Loss'){seqL++;seqW=0;bl=Math.max(bl,seqL);}
+  });
+  const nDias=new Set(T.map(t=>t.data)).size;
+  const diasVerdes=(()=>{const d={};T.forEach(t=>{d[t.data]=(d[t.data]||0)+(t.pnl||0);});return Object.values(d).filter(v=>v>0).length;})();
+
+  // rótulos do eixo
+  const marcas=[maxV,minV+span/2,minV].filter((v,i,a)=>a.indexOf(v)===i);
+
+  let html=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+    <div class="journal-switch">
+      ${[['trade','Por operação'],['dia','Por dia']].map(([v,l])=>`<button class="journal-btn${ui.eqEscala===v?' active':''}" onclick="setEq('eqEscala','${v}')">${l}</button>`).join('')}
+    </div>
+    <select onchange="setEq('eqPeriodo',this.value)" style="width:auto">
+      ${[['','Todo o período'],['30','Últimos 30 dias'],['90','Últimos 90 dias'],['mes','Este mês'],['ano','Este ano']].map(([v,l])=>`<option value="${v}"${ui.eqPeriodo===v?' selected':''}>${l}</option>`).join('')}
+    </select>
+    <span style="color:#4b5563;font-size:11.5px">${T.length} operações · ${nDias} dia${nDias!==1?'s':''}</span>
+  </div>`;
+
+  html+=`<div class="card">
+    <div class="section-label" style="color:#22c55e">📈 RESULTADO ACUMULADO</div>
+    <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px">
+      <span style="font-size:27px;font-weight:700;color:${fim>=0?'#22c55e':'#ef4444'}">${fim>=0?'+':''}${fmt(fim)}</span>
+      <span style="color:#4b5563;font-size:12px">pico de ${fmt(picoMax)}</span>
+    </div>
+    <div style="overflow-x:auto">
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:520px;height:${H}px;display:block">
+        <defs>
+          <linearGradient id="gEq" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#22c55e" stop-opacity="0.32"/>
+            <stop offset="100%" stop-color="#22c55e" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        ${marcas.map(v=>`<g>
+          <line x1="${PL}" y1="${Y(v).toFixed(1)}" x2="${W-PR}" y2="${Y(v).toFixed(1)}" stroke="#161b21" stroke-width="1"/>
+          <text x="${PL+3}" y="${(Y(v)-4).toFixed(1)}" fill="#374151" font-size="10">${fmt(v)}</text>
+        </g>`).join('')}
+        <line x1="${PL}" y1="${y0.toFixed(1)}" x2="${W-PR}" y2="${y0.toFixed(1)}" stroke="#2a323b" stroke-width="1" stroke-dasharray="3 3"/>
+        <path d="${area}" fill="url(#gEq)"/>
+        <path d="${linha}" fill="none" stroke="${fim>=0?'#22c55e':'#ef4444'}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        ${pts.length<=60?pts.map((p,i)=>`<circle cx="${X(i).toFixed(1)}" cy="${Y(p.acc).toFixed(1)}" r="2.5" fill="${p.acc>=0?'#22c55e':'#ef4444'}"><title>${p.rot}: ${fmt(p.acc)}</title></circle>`).join(''):''}
+        <text x="${PL}" y="${H-6}" fill="#374151" font-size="10">${pts[0].rot}</text>
+        <text x="${W-PR}" y="${H-6}" fill="#374151" font-size="10" text-anchor="end">${pts[pts.length-1].rot}</text>
+      </svg>
+    </div>
+  </div>`;
+
+  html+=`<div class="card">
+    <div class="section-label" style="color:#ef4444">📉 DRAWDOWN — QUANTO CAIU DESDE O TOPO</div>
+    <div style="overflow-x:auto">
+      <svg viewBox="0 0 ${W} ${DH}" style="width:100%;min-width:520px;height:${DH}px;display:block">
+        <line x1="${PL}" y1="6" x2="${W-PR}" y2="6" stroke="#2a323b" stroke-width="1" stroke-dasharray="3 3"/>
+        <path d="${ddPath} L${X(pts.length-1).toFixed(1)},6 L${X(0).toFixed(1)},6 Z" fill="#ef444422"/>
+        <path d="${ddPath}" fill="none" stroke="#ef4444" stroke-width="1.6"/>
+      </svg>
+    </div>
+    <div style="color:#4b5563;font-size:11.5px;margin-top:7px">Quando a linha volta ao topo, você recuperou tudo que tinha perdido desde a máxima anterior.</div>
+  </div>`;
+
+  html+=`<div class="grid3">
+    ${[
+      ['MAIOR QUEDA',fmt(ddMin),'#ef4444',picoMax>0?`${ddPctPico.toFixed(0)}% do pico`:''],
+      ['PICO DA CURVA',fmt(picoMax),'#22c55e',''],
+      ['SEQ. DE GANHOS',bw,'#22c55e','maior sequência'],
+      ['SEQ. DE PERDAS',bl,'#ef4444','maior sequência'],
+      ['DIAS NO VERDE',`${diasVerdes}/${nDias}`,diasVerdes>=nDias/2?'#22c55e':'#f59e0b',''],
+      ['MÉDIA POR DIA',fmt(fim/(nDias||1)),fim>=0?'#22c55e':'#ef4444',''],
+    ].map(([l,v,col,sub])=>`<div class="metric"><div style="color:#4b5563;font-size:9.5px;font-weight:700;letter-spacing:.5px">${l}</div><div style="color:${col};font-weight:700;font-size:19px;margin:3px 0 1px">${v}</div><div style="color:#4b5563;font-size:11px">${sub}</div></div>`).join('')}
+  </div>`;
+
+  return html;
+}
+function setEq(k,v){ui[k]=v;render();}
+function checkarBackupInit(){try{checarBackup();}catch{}}
 
 // ══════════════════════════════════════════════════════════════════
 // IMPORTAÇÃO DE CSV
@@ -1542,9 +1732,9 @@ function switchJournal(k){
 }
 function toggleSb(){ui.sbOpen=!ui.sbOpen;render();}
 function toggleJournal(){const ks=Object.keys(JOURNALS);switchJournal(ks[(ks.indexOf(activeJournal)+1)%ks.length]);}
-function setTab(t){ui.tab=t;ui.sbOpen=false;if(t!=='journal')ui._dayFilter=null;render();}
+function setTab(t){ui.tab=t;ui.sbOpen=false;if(t!=='journal'){ui._revisao=false;ui.showForm=false;}if(t!=='journal')ui._dayFilter=null;render();}
 function showForm(){ui.showForm=true;ui.formMode='manual';ui.formTxt='';ui.formImg=null;ui.formErr='';ui.formData=emptyForm();ui._editIdx=null;render();}
-function hideForm(){ui.showForm=false;ui.formImg=null;ui._editIdx=null;render();}
+function hideForm(){ui.showForm=false;ui.formImg=null;ui._editIdx=null;ui._revisao=false;render();}
 function setFormMode(m){ui.formMode=m;render();}
 function setFormTxt(v){ui.formTxt=v;}
 function setFD(k,v){ui.formData[k]=v;render();}
@@ -1631,6 +1821,26 @@ function loadFormImg(event){
 }
 function clearFormImg(){ui.formImg=null;render();}
 
+function pendentes(){
+  return J().trades.map((t,i)=>({t,i})).filter(x=>x.t.importado&&!x.t.revisado).map(x=>x.i);
+}
+function iniciarRevisao(){
+  const p=pendentes();
+  if(!p.length)return;
+  ui._revisao=true;
+  editTrade(p[0]);
+}
+function pularRevisao(dir){
+  const p=pendentes();
+  if(!p.length){ui._revisao=false;ui.showForm=false;render();return;}
+  const atual=ui._editIdx;
+  let pos=p.indexOf(atual);
+  if(pos<0)pos=0;
+  else pos=(pos+dir+p.length)%p.length;
+  editTrade(p[pos]);
+}
+function sairRevisao(){ui._revisao=false;ui.showForm=false;ui._editIdx=null;render();}
+
 function editTrade(i){
   const t=J().trades[i];
   if(!t)return;
@@ -1670,7 +1880,13 @@ function saveTrade(){
   const trade={...f,parciais:parciaisLimpas,revisado:true,janela:classifyJanela(f.hora_entrada)||f.janela||'',pnl:normPnl(f.resultado,f.pnl),rr_realizado:Number(f.rr_realizado)||null,parcial_pct:f.parcial_pct?Number(f.parcial_pct):null,pontos_stop:f.pontos_stop?Number(f.pontos_stop):null,pontos_gain:f.pontos_gain?Number(f.pontos_gain):null};
   if(ui._editIdx!=null){J().trades[ui._editIdx]=trade;ui._editIdx=null;}
   else{J().trades.unshift(trade);}
-  ui.showForm=false;ui.formImg=null;ui.formData=emptyForm();save();render();
+  save();
+  if(ui._revisao){
+    const p=pendentes();
+    if(p.length){ui.formData=emptyForm();editTrade(p[0]);return;}
+    ui._revisao=false;
+  }
+  ui.showForm=false;ui.formImg=null;ui.formData=emptyForm();render();
 }
 
 function addItem(key){
@@ -1696,9 +1912,44 @@ function togglePause(p){
   save();render();
 }
 
-function exportJ(){
+// ── backup automático
+function lerCfgBackup(){
+  try{return JSON.parse(localStorage.getItem('zbackup')||'{}');}catch{return{};}
+}
+function salvarCfgBackup(c){try{localStorage.setItem('zbackup',JSON.stringify(c));}catch{}}
+function totalTrades(){return Object.values(journals).reduce((a,x)=>a+(x.trades||[]).length,0);}
+function checarBackup(){
+  const c=lerCfgBackup();
+  if(c.ativo===false)return;
+  if(!totalTrades())return;
+  const agora=Date.now();
+  const ultimo=c.ultimo||0;
+  const SEMANA=7*24*60*60*1000;
+  if(agora-ultimo<SEMANA)return;
+  // primeira vez: só marca a data, para não baixar nada de surpresa
+  if(!ultimo){salvarCfgBackup({...c,ultimo:agora});return;}
+  ui._backupPend=true;
+}
+function fazerBackupAuto(){
+  exportJ(true);
+  salvarCfgBackup({...lerCfgBackup(),ultimo:Date.now()});
+  ui._backupPend=false;render();
+}
+function adiarBackup(){
+  salvarCfgBackup({...lerCfgBackup(),ultimo:Date.now()-6*24*60*60*1000});
+  ui._backupPend=false;render();
+}
+function toggleBackupAuto(){
+  const c=lerCfgBackup();
+  salvarCfgBackup({...c,ativo:c.ativo===false});
+  render();
+}
+
+function exportJ(auto){
   const b=new Blob([JSON.stringify({journals,activeJournal,version:3},null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`diario-completo-${today().replace(/\//g,'-')}.json`;a.click();
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);
+  a.download=`${auto?'backup-auto':'diario'}-${today().replace(/\//g,'-')}.json`;a.click();
+  if(!auto)salvarCfgBackup({...lerCfgBackup(),ultimo:Date.now()});
 }
 function importJ(e){
   const f=e.target.files[0];if(!f)return;
@@ -1766,6 +2017,7 @@ Com base nesses dados, me ajude a analisar minha performance e identificar padr�
   });
 }
 
+checkarBackupInit();
 render();
 </script>
 </body>
