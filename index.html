@@ -498,6 +498,10 @@ function render(){
         <span style="font-size:14px;font-weight:700;color:${sp>=0?'#22c55e':'#ef4444'}">${fmt(sp)}</span>
         <span style="color:#9aa3ad;font-size:12px">${filtered.length} oper. em ${sd} dia${sd!==1?'s':''} · acerto ${Math.round(sw/filtered.length*100)}% · média ${fmt(sp/filtered.length)}</span>
       </div>`;})():''}
+    ${j.trades.some(t=>t.importado&&!t.revisado)&&!ui.showForm?`<div style="background:#1a1204;border:1px solid #f59e0b44;border-radius:10px;padding:11px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <span style="color:#f59e0b;font-size:12.5px">⚠ ${j.trades.filter(t=>t.importado&&!t.revisado).length} trade(s) importado(s) ainda sem região, gatilho, filtros e emoção. Clique em <b>✏️ Editar</b> no card para completar.</span>
+      ${ui.filter.revisar!=='sim'?`<button class="btn-ghost" onclick="setFilter('revisar','sim')" style="font-size:11.5px;padding:5px 11px">Ver só os pendentes</button>`:''}
+    </div>`:''}
     ${ui._dayFilter?`<div style="background:#1e3a5f55;border:1px solid #22c55e55;border-radius:8px;padding:8px 12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;font-size:12px"><span>📅 Mostrando só o dia <b>${ui._dayFilter}</b></span><button class="btn-ghost" onclick="ui._dayFilter=null;render()" style="font-size:11px;padding:4px 10px">✕ Ver todos</button></div>`:''}`;
 
     if(isLiq()&&(j.confluences.length||j.filters.length||j.regions.length||j.triggers.length)){
@@ -560,8 +564,8 @@ function render(){
           <div style="display:flex;align-items:center;gap:10px">
             <span style="color:${rc};font-weight:700;font-size:15px">${fmt(t.pnl)}</span>
             ${t.rr_realizado?`<span style="color:#64748b;font-size:11px">R:${t.rr_realizado}</span>`:''}
-            <button onclick="event.stopPropagation();editTrade(${idx})" style="background:none;border:none;color:#475569;cursor:pointer;font-size:13px;padding:2px 6px">✏️</button>
-            <button onclick="event.stopPropagation();deleteTrade(${idx})" style="background:none;border:none;color:#334155;cursor:pointer;font-size:18px;padding:0">×</button>
+            <button onclick="event.stopPropagation();editTrade(${idx})" title="Editar trade" style="background:#12161b;border:1px solid #1e242c;border-radius:7px;color:#9aa3ad;cursor:pointer;font-size:11.5px;padding:5px 11px;font-weight:600">✏️ Editar</button>
+            <button onclick="event.stopPropagation();deleteTrade(${idx})" title="Remover trade" style="background:none;border:none;color:#374151;cursor:pointer;font-size:18px;padding:0 2px">×</button>
           </div>
         </div>
         ${open?renderTradeDetail(t):''}
@@ -1626,6 +1630,26 @@ function loadFormImg(event){
   r.readAsDataURL(file);
 }
 function clearFormImg(){ui.formImg=null;render();}
+
+function editTrade(i){
+  const t=J().trades[i];
+  if(!t)return;
+  ui.formData={...emptyForm(),...t,
+    parciais:(t.parciais||[]).map(p=>({...p})),
+    regioes:[...(t.regioes||[])],
+    gatilhos:[...(t.gatilhos||[])],
+    filtros:[...(t.filtros||[])],
+    confluencias:[...(t.confluencias||[])],
+    bt_confluencias:[...(t.bt_confluencias||[])]
+  };
+  ui.formMode='manual';
+  ui.showForm=true;
+  ui._editIdx=i;
+  ui.formErr='';
+  ui.tab='journal';
+  render();
+  try{window.scrollTo({top:0,behavior:'smooth'});}catch{}
+}
 
 function loadImage(event){
   const file=event.target.files[0];if(!file)return;
