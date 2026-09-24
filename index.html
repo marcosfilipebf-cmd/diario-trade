@@ -106,7 +106,7 @@ const JOURNALS={
       timeframes:['M2','M5'],
       sessions:['Manhã','Tarde','Noite','Madrugada'],
       regions:[],triggers:[],filters:[],confluences:[],
-      riskMode:'pct',fixedStop:null,
+      riskMode:'pct',fixedStop:null,valorPonto:null,
     },
     hasFibo:true,
   },
@@ -124,7 +124,7 @@ const JOURNALS={
       triggers:['Pivô oculto','Pivô revelado'],
       filters:['Preço esticado','Frequência baixa','Amplitude alta','Indicador barato/caro'],
       confluences:['POC','VWAP semanal','VWAP diária','VWAP mensal','Troca de polaridade','Fluxo a favor','Fluxo contra','Absorção','Agressão'],
-      riskMode:'pct',fixedStop:null,
+      riskMode:'pct',fixedStop:null,valorPonto:0.20,
     },
     hasFibo:false,
   },
@@ -152,7 +152,7 @@ function initJournal(key){
   return {trades:[],capital:d.capital,pairs:[...d.pairs],paused:[...d.paused],setups:[...d.setups],
     results:[...d.results],timeframes:[...d.timeframes],sessions:[...d.sessions],
     regions:[...d.regions],triggers:[...d.triggers],filters:[...d.filters],confluences:[...d.confluences],
-    maxConsec:d.maxConsec,maxLossPct:d.maxLossPct,riskPct:d.riskPct,riskMode:d.riskMode,fixedStop:d.fixedStop};
+    maxConsec:d.maxConsec,maxLossPct:d.maxLossPct,riskPct:d.riskPct,riskMode:d.riskMode,fixedStop:d.fixedStop,valorPonto:d.valorPonto};
 }
 
 const _now=new Date();
@@ -1095,17 +1095,18 @@ function renderStats(){
 // ══════════════════════════════════════════════════════════════════
 // IMPORTAÇÃO DE CSV
 // ══════════════════════════════════════════════════════════════════
+function norm(x){return String(x).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();}
 const CAMPOS=[
-  {k:'data',   nome:'Data',           chaves:['data','date','abertura','dia']},
+  {k:'data',   nome:'Data',          chaves:['data','abertura','date','dia']},
   {k:'hora_entrada',nome:'Hora entrada',chaves:['abertura','entrada','hora inicial','inicio','open']},
-  {k:'hora_saida',  nome:'Hora saída', chaves:['fechamento','saida','saída','hora final','close']},
-  {k:'par',    nome:'Ativo',           chaves:['ativo','papel','instrumento','symbol','contrato']},
-  {k:'qtd',    nome:'Quantidade',      chaves:['qtd','quantidade','lotes','contratos','volume']},
-  {k:'direcao',nome:'Direção',         chaves:['qtd','lado','side','tipo','direcao','direção','c/v','operacao']},
-  {k:'pnl',    nome:'Resultado R$',    chaves:['res. operação','res operacao','resultado','result','lucro','financeiro','líquido','liquido','p&l','pnl']},
-  {k:'pontos', nome:'Resultado pts',   chaves:['pts','pontos','res. intervalo (%)','intervalo']},
-  {k:'preco_entrada',nome:'Preço entrada',chaves:['preço compra','preco compra','preço de entrada','entrada']},
-  {k:'preco_saida',  nome:'Preço saída',  chaves:['preço venda','preco venda','preço de saída','saida']},
+  {k:'hora_saida',  nome:'Hora saida', chaves:['fechamento','saida','hora final','close']},
+  {k:'par',    nome:'Ativo',          chaves:['ativo','papel','instrumento','symbol','contrato']},
+  {k:'qtd',    nome:'Quantidade',     chaves:['qtd compra','qtd','quantidade','lotes','contratos','volume']},
+  {k:'direcao',nome:'Direcao (C/V)',  chaves:['lado','side','direcao','tipo','c/v','operacao tipo']},
+  {k:'pnl',    nome:'Resultado R$',   chaves:['res. operacao','res operacao','resultado operacao','res. intervalo bruto','resultado','lucro','financeiro','liquido','p&l','pnl'],evita:['%','pts','ponto']},
+  {k:'pontos', nome:'Resultado pts',  chaves:['res. operacao (%)','res. intervalo (%)','pts','pontos','intervalo (%)'],prefere:['%','pts','ponto']},
+  {k:'preco_entrada',nome:'Preco entrada',chaves:['preco compra','preco de entrada','preco entrada']},
+  {k:'preco_saida',  nome:'Preco saida',  chaves:['preco venda','preco de saida','preco saida']},
 ];
 
 function splitCSVLine(line,delim){
@@ -1120,10 +1121,9 @@ function splitCSVLine(line,delim){
   return out.map(x=>x.trim().replace(/^"|"$/g,''));
 }
 function detectDelim(txt){
-  const l=txt.split(/\r?\n/).find(x=>x.trim());
-  if(!l)return ';';
+  const ls=txt.split(/\r?\n/).filter(x=>x.trim()).slice(0,12);
   const c={';':0,',':0,'\t':0};
-  Object.keys(c).forEach(d=>c[d]=l.split(d).length);
+  Object.keys(c).forEach(d=>{c[d]=Math.max(...ls.map(l=>l.split(d).length));});
   return Object.entries(c).sort((a,b)=>b[1]-a[1])[0][0];
 }
 function parseCSV(txt){
@@ -1133,8 +1133,12 @@ function parseCSV(txt){
   if(!linhas.length)return null;
   // acha a linha de cabeçalho (a que tem mais colunas preenchidas)
   let hi=0,best=0;
-  for(let i=0;i<Math.min(8,linhas.length);i++){
-    const n=splitCSVLine(linhas[i],delim).filter(Boolean).length;
+  for(let i=0;i<Math.min(12,linhas.length);i++){
+    const cols=splitCSVLine(linhas[i],delim);
+    const n=cols.filter(Boolean).length;
+    if(n<3)continue;                                   // linha de metadado
+    const texto=cols.filter(c=>c&&numBR(c)===null).length;
+    if(texto<n*0.6)continue;                            // linha de dados, não cabeçalho
     if(n>best){best=n;hi=i;}
   }
   const head=splitCSVLine(linhas[hi],delim);
@@ -1142,22 +1146,33 @@ function parseCSV(txt){
   return{head,rows,delim};
 }
 function autoMap(head){
-  const m={};
-  const usados=new Set();
+  const m={},usados=new Set();
+  const hn=head.map(h=>norm(h));
   CAMPOS.forEach(f=>{
     let melhor=-1,score=0;
-    head.forEach((h,i)=>{
-      const hl=h.toLowerCase().trim();
-      if(!hl)return;
-      f.chaves.forEach(c=>{
-        let sc=0;
-        if(hl===c)sc=100;
-        else if(hl.startsWith(c))sc=70;
-        else if(hl.includes(c))sc=50;
-        if(sc>score&&(!usados.has(i)||f.k==='direcao'||f.k==='data')){score=sc;melhor=i;}
+    hn.forEach((h,i)=>{
+      if(!h)return;
+      let sc=0;
+      f.chaves.forEach((c,ordem)=>{
+        const cn=norm(c);
+        let base=0;
+        if(h===cn)base=100;
+        else if(h.startsWith(cn))base=75;
+        else if(h.includes(cn))base=55;
+        if(base){
+          base-=ordem*3;                               // respeita a ordem da lista
+          if(f.evita&&f.evita.some(e=>h.includes(e)))base-=60;
+          if(f.prefere&&f.prefere.some(e=>h.includes(e)))base+=20;
+          if(sc<base)sc=base;
+        }
       });
+      const livre=!usados.has(i)||['direcao','data','hora_entrada'].includes(f.k);
+      if(sc>score&&livre){score=sc;melhor=i;}
     });
-    if(melhor>=0&&score>0){m[f.k]=melhor;if(f.k!=='direcao'&&f.k!=='data')usados.add(melhor);}
+    if(melhor>=0&&score>0){
+      m[f.k]=melhor;
+      if(!['direcao','data','hora_entrada'].includes(f.k))usados.add(melhor);
+    }
   });
   return m;
 }
@@ -1192,10 +1207,17 @@ function extraiDirecao(v){
   if(/\bV\b|VENDA|SELL|SHORT/.test(t))return 'Venda';
   return '';
 }
-function linhaParaTrade(r,map){
+function linhaParaTrade(r,map,cfg){
+  cfg=cfg||{};
   const g=k=>map[k]!==undefined?r[map[k]]:'';
-  const pnl=numBR(g('pnl'));
+  let pnl=numBR(g('pnl'));
   const pts=numBR(g('pontos'));
+  const qtdN=numBR(g('qtd'));
+  let derivado=false;
+  if(pnl===null&&pts!==null&&cfg.valorPonto){
+    pnl=pts*(qtdN||1)*cfg.valorPonto;
+    derivado=true;
+  }
   const t=emptyForm();
   t.data=extraiData(g('data'))||extraiData(g('hora_entrada'))||today();
   t.hora_entrada=extraiHora(g('hora_entrada'));
@@ -1204,12 +1226,18 @@ function linhaParaTrade(r,map){
   const ativo=String(g('par')||'').toUpperCase().replace(/[^A-Z]/g,'');
   t.par=J().pairs.find(p=>ativo.startsWith(p))||ativo.slice(0,6)||J().pairs[0]||'';
   t.direcao=extraiDirecao(g('direcao'))||extraiDirecao(g('qtd'));
-  t.qtd=numBR(g('qtd'));
+  let q=numBR(g('qtd'));
+  if(!q){ // tenta a coluna do outro lado, quando o relatório separa compra e venda
+    const alt=(map.qtd!==undefined?map.qtd+1:-1);
+    if(alt>=0&&alt<r.length)q=numBR(r[alt]);
+  }
+  t.qtd=q;
   t.preco_entrada=numBR(g('preco_entrada'));
   t.preco_saida=numBR(g('preco_saida'));
   t.resultado=pnl===null?'':pnl>0?'Win':pnl<0?'Loss':'BE';
   t.pnl=pnl===null?0:pnl;
   t.pontos_resultado=pts;
+  t.pnlDerivado=derivado;
   t.importado=true;
   t.revisado=false;
   return t;
@@ -1217,28 +1245,41 @@ function linhaParaTrade(r,map){
 function chaveTrade(t){return `${t.data}|${t.hora_entrada}|${Number(t.pnl).toFixed(2)}`;}
 
 function abrirImport(){
-  imp={etapa:'arquivo',head:[],rows:[],map:{},nome:''};
+  imp={etapa:'arquivo',head:[],rows:[],map:{},nome:'',valorPonto:J().valorPonto||null};
   render();
 }
 function fecharImport(){imp=null;render();}
+function decodeCSV(buf){
+  let txt=new TextDecoder('utf-8',{fatal:false}).decode(buf);
+  // se aparecer caractere de substituição, o arquivo é latin-1 (padrão das corretoras)
+  if(txt.includes('\uFFFD')||/Ã§|Ã£|Ã©|Ãµ/.test(txt)){
+    try{txt=new TextDecoder('iso-8859-1').decode(buf);}catch{}
+  }
+  return txt;
+}
 function lerCSV(ev){
   const f=ev.target.files[0];if(!f)return;
   const r=new FileReader();
   r.onload=e=>{
-    const p=parseCSV(e.target.result);
+    const p=parseCSV(decodeCSV(e.target.result));
     if(!p||!p.rows.length){alert('Não consegui ler esse arquivo. Confira se é o CSV exportado do relatório.');return;}
-    imp={etapa:'mapear',head:p.head,rows:p.rows,map:autoMap(p.head),nome:f.name};
+    imp={etapa:'mapear',head:p.head,rows:p.rows,map:autoMap(p.head),nome:f.name,valorPonto:J().valorPonto||null};
     render();
   };
-  r.readAsText(f,'utf-8');
+  r.readAsArrayBuffer(f);
 }
 function setMap(k,v){imp.map[k]=v===''?undefined:Number(v);render();}
+function setValorPonto(v){
+  const n=parseFloat(String(v).replace(',','.'));
+  imp.valorPonto=isNaN(n)||n<=0?null:n;
+  J().valorPonto=imp.valorPonto;save();render();
+}
 function confirmarImport(){
   const j=J();
   const existentes=new Set(j.trades.map(chaveTrade));
   let novos=0,dup=0,ruins=0;
   imp.rows.forEach(r=>{
-    const t=linhaParaTrade(r,imp.map);
+    const t=linhaParaTrade(r,imp.map,{valorPonto:imp.valorPonto});
     if(!t.resultado||!t.data){ruins++;return;}
     if(existentes.has(chaveTrade(t))){dup++;return;}
     existentes.add(chaveTrade(t));
@@ -1271,8 +1312,9 @@ function renderImport(){
       <div style="color:#334155;font-size:11px;margin-top:14px">Trades repetidos são detectados e não entram duas vezes.</div>
     </div>`;
   } else {
-    const amostra=imp.rows.slice(0,5).map(r=>linhaParaTrade(r,imp.map));
-    const okCount=imp.rows.map(r=>linhaParaTrade(r,imp.map)).filter(t=>t.resultado&&t.data).length;
+    const cfg={valorPonto:imp.valorPonto};
+    const amostra=imp.rows.slice(0,5).map(r=>linhaParaTrade(r,imp.map,cfg));
+    const okCount=imp.rows.map(r=>linhaParaTrade(r,imp.map,cfg)).filter(t=>t.resultado&&t.data).length;
     body=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
       <div style="font-weight:700;font-size:15px">Conferir colunas</div>
       <span style="color:#475569;font-size:12px">${escHtml(imp.nome)} · ${imp.rows.length} linhas</span>
@@ -1280,13 +1322,34 @@ function renderImport(){
     <div style="color:#64748b;font-size:12px;margin-bottom:14px">Detectei as colunas automaticamente. Ajuste o que estiver errado e confira a prévia embaixo.</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:16px">
       ${CAMPOS.map(f=>`<div>
-        <label class="label">${f.nome}</label>
+        <label class="label">${f.nome}${(f.k==='data')?' <span style="color:#ef4444">*</span>':''}${(f.k==='pnl'||f.k==='pontos')?' <span style="color:#f59e0b">*</span>':''}</label>
         <select onchange="setMap('${f.k}',this.value)">
           <option value="">— ignorar —</option>
           ${imp.head.map((h,i)=>`<option value="${i}"${imp.map[f.k]===i?' selected':''}>${escHtml(h||'coluna '+(i+1))}</option>`).join('')}
         </select>
       </div>`).join('')}
     </div>
+    ${(imp.map.pnl===undefined&&imp.map.pontos!==undefined)?`
+      <div style="background:#1a1204;border:1px solid #f59e0b55;border-radius:9px;padding:13px;margin-bottom:16px">
+        <div style="color:#f59e0b;font-size:12.5px;font-weight:700;margin-bottom:5px">Seu arquivo não tem coluna de resultado em reais</div>
+        <div style="color:#9aa3ad;font-size:12px;line-height:1.7;margin-bottom:10px">
+          Sem problema: posso calcular pelo resultado em pontos. Informe quanto vale 1 ponto por contrato.
+          No mini índice (WIN) cada ponto vale <b>R$ 0,20</b>. A conta fica: pontos × contratos × valor do ponto.
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span style="color:#9aa3ad;font-size:12px">Valor do ponto:</span>
+          <input type="number" step="0.01" value="${imp.valorPonto??''}" oninput="setValorPonto(this.value)" placeholder="0.20" style="width:110px">
+          ${!imp.valorPonto?`<span style="color:#ef4444;font-size:11.5px">preencha para liberar a importação</span>`:`<span style="color:#22c55e;font-size:11.5px">✓ resultados calculados na prévia abaixo</span>`}
+        </div>
+      </div>`:''}
+    ${(imp.map.pnl===undefined&&imp.map.pontos===undefined)?`
+      <div style="background:#1a0b0b;border:1px solid #ef444455;border-radius:9px;padding:13px;margin-bottom:16px;color:#fca5a5;font-size:12.5px;line-height:1.7">
+        <b>Falta o resultado.</b> Escolha acima, em <b>Resultado R$</b> ou <b>Resultado pts</b>, a coluna do seu arquivo que traz o resultado da operação. Sem ela não dá para importar.
+      </div>`:''}
+    ${imp.map.data===undefined?`
+      <div style="background:#1a0b0b;border:1px solid #ef444455;border-radius:9px;padding:13px;margin-bottom:16px;color:#fca5a5;font-size:12.5px">
+        <b>Falta a data.</b> Escolha acima, em <b>Data</b>, a coluna que traz a data da operação.
+      </div>`:''}
     <div style="color:#22c55e;font-size:10px;font-weight:700;letter-spacing:0.6px;margin-bottom:8px">PRÉVIA (5 primeiras linhas)</div>
     <div style="overflow-x:auto;border:1px solid #1e3a5f;border-radius:8px;margin-bottom:14px">
       <table class="prev">
@@ -1296,13 +1359,13 @@ function renderImport(){
           <td style="color:${janelaCor(t.janela)}">${escHtml(t.janela||'—')}</td>
           <td>${escHtml(t.par||'—')}</td><td>${escHtml(t.direcao||'—')}</td><td>${t.qtd??'—'}</td>
           <td style="color:${rcColor(t.resultado)};font-weight:700">${escHtml(t.resultado||'—')}</td>
-          <td style="color:${t.pnl>=0?'#22c55e':'#ef4444'};font-weight:700">${fmt(t.pnl)}</td>
+          <td style="color:${t.resultado?(t.pnl>=0?'#22c55e':'#ef4444'):'#4b5563'};font-weight:700">${t.resultado?fmt(t.pnl):'—'}${t.pnlDerivado?'<span style="color:#f59e0b" title="calculado pelos pontos"> ƒ</span>':''}</td>
           <td>${t.pontos_resultado??'—'}</td>
         </tr>`).join('')}
       </table>
     </div>
     <div style="background:#060d1f;border:1px solid #1e3a5f;border-radius:8px;padding:11px;margin-bottom:14px;color:#94a3b8;font-size:12px">
-      ${okCount} de ${imp.rows.length} linhas prontas para importar. Depois é só abrir cada trade e preencher região, gatilho, filtros e emoção — eles ficam marcados como <b style="color:#f59e0b">a revisar</b>.
+      <b style="color:${okCount?'#22c55e':'#ef4444'}">${okCount} de ${imp.rows.length}</b> linhas prontas para importar.${okCount<imp.rows.length?' As demais estão sem data ou sem resultado.':''} Depois é só abrir cada trade e preencher região, gatilho, filtros e emoção — eles ficam marcados como <b style="color:#f59e0b">a revisar</b>.
     </div>
     <div style="display:flex;justify-content:flex-end;gap:8px">
       <button class="btn-ghost" onclick="fecharImport()">Cancelar</button>
