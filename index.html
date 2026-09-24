@@ -6,59 +6,85 @@
 <title>Diário Zella</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#060d1f;color:#f1f5f9;font-family:system-ui,-apple-system,sans-serif;padding:20px}
+body{background:#080a0c;color:#e8eaed;font-family:system-ui,-apple-system,sans-serif;padding:0}
+.shell{display:flex;min-height:100vh}
+.sidebar{width:236px;flex-shrink:0;background:#0b0e11;border-right:1px solid #1a1f26;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+.sb-brand{display:flex;align-items:center;gap:10px;padding:18px 18px 14px}
+.sb-logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#22c55e,#16a34a);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;color:#08120b}
+.sb-acct{margin:0 12px 14px;background:#12161b;border:1px solid #1a1f26;border-radius:10px;padding:9px 11px;display:flex;align-items:center;gap:9px;cursor:pointer}
+.sb-sec{color:#4b5563;font-size:9px;font-weight:800;letter-spacing:1.1px;padding:12px 18px 6px}
+.sb-item{display:flex;align-items:center;gap:11px;padding:9px 18px;color:#9aa3ad;cursor:pointer;font-size:13.5px;font-weight:500;border:none;background:none;width:100%;text-align:left;border-left:2px solid transparent}
+.sb-item:hover{color:#e8eaed;background:#12161b}
+.sb-item.active{color:#22c55e;background:#22c55e12;border-left-color:#22c55e;font-weight:600}
+.sb-badge{margin-left:auto;background:#f59e0b22;color:#f59e0b;border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700}
+.main{flex:1;min-width:0;padding:22px 26px 60px}
+.page-head{margin-bottom:20px}
+.page-title{font-size:21px;font-weight:700;display:flex;align-items:center;gap:9px}
+.page-sub{color:#6b7280;font-size:13px;margin-top:3px}
+.sb-toggle{display:none}
+@media(max-width:860px){
+ .sidebar{position:fixed;left:0;top:0;z-index:400;transform:translateX(-100%);transition:transform .2s;box-shadow:0 0 40px #000}
+ .sidebar.open{transform:none}
+ .main{padding:14px 14px 60px}
+ .sb-toggle{display:flex;align-items:center;gap:9px;margin-bottom:14px}
+}
 @keyframes spin{to{transform:rotate(360deg)}}
 ::-webkit-scrollbar{width:4px}
 ::-webkit-scrollbar-thumb{background:#1e3a5f;border-radius:4px}
 input::placeholder,textarea::placeholder{color:#334155}
-.spinner{display:inline-block;width:13px;height:13px;border:2px solid #334155;border-top:2px solid #6366f1;border-radius:50%;animation:spin 0.8s linear infinite}
+.spinner{display:inline-block;width:13px;height:13px;border:2px solid #334155;border-top:2px solid #22c55e;border-radius:50%;animation:spin 0.8s linear infinite}
 .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
-.card{background:#0d1526;border-radius:12px;border:1px solid #1e3a5f;padding:16px;margin-bottom:12px}
-.btn-primary{background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;border-radius:8px;color:#fff;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+.card{background:#0e1216;border-radius:12px;border:1px solid #1a1f26;padding:16px;margin-bottom:12px}
+.btn-primary{background:linear-gradient(135deg,#22c55e,#16a34a);border:none;border-radius:8px;color:#fff;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
 .btn-primary:disabled{background:#1e3a5f;cursor:not-allowed;opacity:0.5}
-.btn-ghost{background:none;border:1px solid #1e3a5f;border-radius:8px;color:#64748b;padding:8px 14px;cursor:pointer;font-size:12px}
+.btn-ghost{background:#12161b;border:1px solid #1e242c;border-radius:8px;color:#9aa3ad;padding:8px 14px;cursor:pointer;font-size:12px}
 .btn-danger{background:none;border:none;color:#ef4444;cursor:pointer;font-size:12px;padding:2px 6px;border-radius:4px}
 .btn-danger:hover{background:#ef444422}
 .tab{background:none;border:none;border-bottom:2px solid transparent;color:#475569;padding:11px 18px;cursor:pointer;font-weight:600;font-size:13px;white-space:nowrap}
-.tab.active{border-bottom-color:#6366f1;color:#6366f1}
-select,input[type=text],input[type=number],input[type=date],input[type=time],textarea{background:#060d1f;border:1px solid #1e3a5f;border-radius:8px;color:#f1f5f9;font-size:13px;padding:8px 10px;outline:none;width:100%;font-family:inherit}
+.tab.active{border-bottom-color:#22c55e;color:#22c55e}
+select,input[type=text],input[type=number],input[type=date],input[type=time],textarea{background:#0b0e11;border:1px solid #1e242c;border-radius:8px;color:#f1f5f9;font-size:13px;padding:8px 10px;outline:none;width:100%;font-family:inherit}
 select option{background:#0d1526}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
 .grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px}
 .label{color:#64748b;font-size:11px;display:block;margin-bottom:4px}
 .section-label{font-size:10px;font-weight:700;letter-spacing:0.8px;margin-bottom:10px}
-.trade-card{background:#0b1220;border-radius:12px;margin-bottom:8px;overflow:hidden}
+.trade-card{background:#0e1216;border-radius:12px;margin-bottom:8px;overflow:hidden}
 .trade-row{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;flex-wrap:wrap;gap:8px;cursor:pointer}
 .trade-detail{padding:12px 16px;border-top:1px solid #1e3a5f;display:grid;gap:10px}
 .toggle-wrap{display:flex;align-items:center;gap:8px;cursor:pointer}
 .toggle-track{width:36px;height:20px;border-radius:10px;position:relative;transition:background 0.2s;flex-shrink:0;cursor:pointer}
 .toggle-thumb{width:14px;height:14px;border-radius:50%;background:#fff;position:absolute;top:3px;transition:left 0.2s}
 .alert{background:#2d0606;border:1px solid #ef4444;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px}
-.stats-bar{background:#08111f;border-bottom:1px solid #1e3a5f;padding:10px 20px;display:flex;gap:24px;overflow-x:auto}
-.metric{background:#0d1526;border-radius:10px;padding:12px 14px;border:1px solid #1e3a5f}
+.stats-bar{background:#0e1216;border:1px solid #1a1f26;border-radius:12px;padding:13px 18px;display:flex;gap:26px;overflow-x:auto;margin-bottom:16px}
+.metric{background:#0e1216;border-radius:10px;padding:13px 15px;border:1px solid #1a1f26}
 .img-preview{max-width:100%;border-radius:8px;margin-top:8px;border:1px solid #1e3a5f}
-.capital-input{background:#060d1f;border:1px solid #6366f1;border-radius:8px;color:#6366f1;font-size:14px;font-weight:700;padding:4px 8px;width:110px;outline:none;text-align:center}
+.capital-input{background:#060d1f;border:1px solid #22c55e;border-radius:8px;color:#22c55e;font-size:14px;font-weight:700;padding:4px 8px;width:110px;outline:none;text-align:center}
 .tag-item{display:inline-flex;align-items:center;gap:6px;background:#1e3a5f;border-radius:20px;padding:4px 10px;font-size:12px;color:#94a3b8;margin:3px}
 .add-row{display:flex;gap:8px;margin-top:8px}
 .add-row input{flex:1}
 .journal-switch{display:flex;gap:4px;background:#0d1526;border-radius:10px;padding:4px;border:1px solid #1e3a5f}
 .journal-btn{background:none;border:none;border-radius:7px;color:#475569;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:700;transition:all 0.15s;white-space:nowrap}
-.journal-btn.active{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff}
+.journal-btn.active{background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff}
 .chip{border-radius:6px;padding:5px 11px;cursor:pointer;font-size:12px;border:1px solid;transition:all 0.15s;white-space:nowrap}
 .filter-box{background:#060d1f;border-radius:10px;padding:14px;border:1px solid}
 .check-row{display:flex;align-items:center;gap:9px;cursor:pointer;padding:6px 0}
 .checkbox{width:19px;height:19px;border-radius:5px;border:2px solid;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;flex-shrink:0;transition:all 0.15s}
 input[type=time]::-webkit-calendar-picker-indicator{filter:invert(0.6)}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr) 1.1fr;gap:6px}
-.cal-cell{background:#0b1220;border:1px solid #1e3a5f;border-radius:9px;min-height:86px;padding:8px;display:flex;flex-direction:column;justify-content:space-between;cursor:default}
+.cal-cell{background:#0e1216;border:1px solid #1a1f26;border-radius:9px;min-height:86px;padding:8px;display:flex;flex-direction:column;justify-content:space-between;cursor:default}
 .cal-cell.win{border-color:#22c55e66;background:#052e1655}
 .cal-cell.loss{border-color:#ef444466;background:#2d060655}
 .cal-cell.be{border-color:#f59e0b55}
 .cal-cell.empty{background:transparent;border:none}
-.cal-week{background:#0d1526;border:1px solid #1e3a5f;border-radius:9px;min-height:86px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.cal-week{background:#12161b;border:1px solid #1a1f26;border-radius:9px;min-height:86px;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .mini-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
 .mini-cell{aspect-ratio:1;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700}
+table.prev{width:100%;border-collapse:collapse;font-size:11px}
+table.prev th{color:#475569;font-weight:700;text-align:left;padding:6px 8px;border-bottom:1px solid #1e3a5f;white-space:nowrap}
+table.prev td{padding:6px 8px;border-bottom:1px solid #0f1b33;color:#cbd5e1;white-space:nowrap}
+.modal-bg{position:fixed;inset:0;background:#000000cc;z-index:500;display:flex;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto}
+.modal{background:#0e1216;border:1px solid #1a1f26;border-radius:14px;max-width:1000px;width:100%;padding:20px}
 </style>
 </head>
 <body>
@@ -113,7 +139,7 @@ const CTXS=['Tendência','Lateral','Pós-notícia'];
 const TGTS=['0.382','0 (alvo)','Rompeu','Saiu antes'];
 const WEEKDAYS=['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
 const RC_DEFAULT={Win:'#22c55e',Loss:'#ef4444',BE:'#f59e0b','BE e depois andou':'#f97316'};
-const EC={Neutro:'#64748b',Confiante:'#22c55e',Ansioso:'#f59e0b','Com medo':'#ef4444',Empolgado:'#6366f1',Frustrado:'#ef4444',Impaciente:'#f59e0b',Calmo:'#22c55e'};
+const EC={Neutro:'#64748b',Confiante:'#22c55e',Ansioso:'#f59e0b','Com medo':'#ef4444',Empolgado:'#22c55e',Frustrado:'#ef4444',Impaciente:'#f59e0b',Calmo:'#22c55e'};
 
 // ══════════════════════════════════════════════════════════════════
 // STATE
@@ -130,8 +156,9 @@ function initJournal(key){
 }
 
 const _now=new Date();
-let ui={tab:'journal',calView:'mes',calMonth:_now.getMonth(),calYear:_now.getFullYear(),showForm:false,
-  filter:{setup:'',resultado:'',par:'',periodo:'',diaSemana:'',janela:'',regioes:[],gatilhos:[],confluencias:[],filtros:[],filtrosOk:''},
+let imp=null;
+let ui={tab:'journal',sbOpen:false,calView:'mes',calMonth:_now.getMonth(),calYear:_now.getFullYear(),showForm:false,
+  filter:{setup:'',resultado:'',par:'',periodo:'',diaSemana:'',janela:'',revisar:'',regioes:[],gatilhos:[],confluencias:[],filtros:[],filtrosOk:''},
   formMode:'manual',formTxt:'',formImg:null,formData:null,formLoading:false,formErr:'',openTrades:{},_editIdx:null};
 
 function J(){return journals[activeJournal];}
@@ -141,7 +168,7 @@ function isLiq(){return CFG().mode==='liquidity';}
 function emptyForm(){
   return {par:'',setup:'',regioes:[],gatilhos:[],direcao:'',resultado:'',pnl:'',rr_realizado:'',
   filtros:[],confluencias:[],
-  hora_entrada:'',hora_saida:'',janela:'',pontos_stop:'',pontos_gain:'',saiu_parcial:false,parcial_pct:'',
+  hora_entrada:'',hora_saida:'',janela:'',qtd:'',preco_entrada:'',preco_saida:'',pontos_resultado:null,importado:false,revisado:false,pontos_stop:'',pontos_gain:'',saiu_parcial:false,parcial_pct:'',
   fibo_nivel:'',timeframe:'',sessao:'',emocao:'',seguiu_regras:true,moveu_be_cedo:false,tinha_confluencia:true,lt_rompimento_forte:null,
   erros:'',acertos:'',data:today(),notas:'',resumo_ia:'',score:null,imagem:null,
   bt_confluencias:[],bt_tinha_lt_choch:false,bt_retestou:false,bt_tipo_retest:'',bt_mm_proxima:false,bt_mm_respeitou:'',bt_candles_ate_alvo:'',bt_lt_forca:'',bt_ate_onde_foi:'',bt_saiu_antes:false,bt_motivo_saiu:'',bt_contexto:''};
@@ -213,15 +240,15 @@ function calcStats(trades){
   const avgRR=rrs.length?(rrs.reduce((s,t)=>s+t.rr_realizado,0)/rrs.length).toFixed(2):'—';
   return{totalPnl,wins:wins.length,losses:losses.length,winRate:Math.round((wins.length/trades.length)*100),pf,avgRR};
 }
-function rcColor(r){return RC_DEFAULT[r]||'#6366f1';}
+function rcColor(r){return RC_DEFAULT[r]||'#22c55e';}
 // ── horários / períodos do pregão
 const JANELAS=[
   {nome:'Pré-abertura',ini:0,fim:539,cor:'#64748b'},
   {nome:'Abertura (9h)',ini:540,fim:599,cor:'#f59e0b'},
-  {nome:'Abertura das ações (10h)',ini:600,fim:629,cor:'#8b5cf6'},
+  {nome:'Abertura das ações (10h)',ini:600,fim:629,cor:'#16a34a'},
   {nome:'Abertura EUA (10h30)',ini:630,fim:689,cor:'#06b6d4'},
   {nome:'Meio do dia',ini:690,fim:899,cor:'#64748b'},
-  {nome:'Tarde',ini:900,fim:1019,cor:'#6366f1'},
+  {nome:'Tarde',ini:900,fim:1019,cor:'#22c55e'},
   {nome:'Fechamento',ini:1020,fim:1439,cor:'#ef4444'},
 ];
 function hm2min(h){if(!h)return null;const p=String(h).split(':').map(Number);if(isNaN(p[0]))return null;return p[0]*60+(p[1]||0);}
@@ -280,11 +307,11 @@ IMPORTANTE: "regioes", "gatilhos", "filtros" e "confluencias" são ARRAYS (um tr
 
 // ── UI HELPERS ─────────────────────────────────────────────────────
 function badge(text,color){return `<span class="badge" style="background:${color}22;color:${color};border:1px solid ${color}44">${escHtml(String(text))}</span>`;}
-function toggle(checked,onchange,label){return `<label class="toggle-wrap"><div class="toggle-track" style="background:${checked?'#6366f1':'#1e3a5f'}" onclick="${onchange}"><div class="toggle-thumb" style="left:${checked?18:3}px"></div></div>${label?`<span style="color:#94a3b8;font-size:13px">${label}</span>`:''}</label>`;}
+function toggle(checked,onchange,label){return `<label class="toggle-wrap"><div class="toggle-track" style="background:${checked?'#22c55e':'#1e3a5f'}" onclick="${onchange}"><div class="toggle-thumb" style="left:${checked?18:3}px"></div></div>${label?`<span style="color:#94a3b8;font-size:13px">${label}</span>`:''}</label>`;}
 function sel(val,opts,onchange,placeholder=''){return `<select onchange="${onchange}"><option value="">${placeholder}</option>${opts.map(o=>`<option value="${escHtml(o)}"${val===o?'selected':''}>${escHtml(o)}</option>`).join('')}</select>`;}
 function inp(val,onchange,placeholder='',type='text'){return `<input type="${type}" value="${escHtml(String(val||''))}" oninput="${onchange.replace('setFD(','setFDq(')}" placeholder="${placeholder}">`;}
 function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function chips(opts,selected,fn,color='#6366f1'){
+function chips(opts,selected,fn,color='#22c55e'){
   return `<div style="display:flex;flex-wrap:wrap;gap:6px">${opts.map((o,i)=>{
     const a=(selected||[]).includes(o);
     return `<button type="button" class="chip" onclick="${fn}(${i})" style="background:${a?color+'2a':'transparent'};border-color:${a?color:'#1e3a5f'};color:${a?color:'#475569'}">${escHtml(o)}</button>`;
@@ -315,6 +342,7 @@ function render(){
       if(ui.filter.filtrosOk==='nao'&&ok!==false)return false;
     }
     if(ui.filter.janela&&t.janela!==ui.filter.janela)return false;
+    if(ui.filter.revisar==='sim'&&!(t.importado&&!t.revisado))return false;
     if(ui.filter.resultado&&t.resultado!==ui.filter.resultado)return false;
     if(ui.filter.par&&t.par!==ui.filter.par)return false;
     if(ui.filter.diaSemana&&weekday(t.data)!==ui.filter.diaSemana)return false;
@@ -325,61 +353,85 @@ function render(){
     return true;
   });
 
-  // ── HEADER
-  let html=`
-  <div style="background:#080f23;border-bottom:1px solid #1e3a5f;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;margin:-20px -20px 0;position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:10px">
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <div style="width:34px;height:34px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px">Z</div>
-      <div>
-        <div style="font-weight:800;font-size:16px">Diário <span style="color:#6366f1">Zella</span></div>
-        <div style="color:#334155;font-size:10px">${c.subtitle}</div>
-      </div>
-      <div class="journal-switch">
-        ${Object.entries(JOURNALS).map(([k,v])=>`<button class="journal-btn${activeJournal===k?' active':''}" onclick="switchJournal('${k}')">${v.icon} ${v.name}</button>`).join('')}
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <div style="display:flex;align-items:center;gap:6px">
-        <span style="color:#475569;font-size:11px">Capital:</span>
-        <input class="capital-input" type="number" value="${j.capital}" onchange="updateCapital(this.value)">
-      </div>
-      <label class="btn-ghost" style="font-size:11px;padding:6px 12px;cursor:pointer">📥<input type="file" accept=".json" onchange="importJ(event)" style="display:none;width:auto"></label>
-      <button class="btn-ghost" onclick="exportJ()" style="font-size:11px;padding:6px 12px">📤</button>
-    </div>
-  </div>`;
+  // ── SHELL + SIDEBAR
+  const nRev=j.trades.filter(t=>t.importado&&!t.revisado).length;
+  const NAV=[
+    {sec:'SESSÃO'},
+    {id:'journal',ic:'📝',label:'Diário',badge:nRev||null},
+    {id:'calendar',ic:'📅',label:'Calendário'},
+    {sec:'ANÁLISE'},
+    {id:'stats',ic:'📊',label:'Análise'},
+    {sec:'CONTA'},
+    {id:'config',ic:'⚙️',label:'Configurações'},
+  ];
+  const PAGES={
+    journal:['Diário','Registre e revise cada operação'],
+    calendar:['Calendário','Visualize seu desempenho diário e semanal'],
+    stats:['Análise','Recortes e padrões das suas operações'],
+    config:['Configurações','Listas, gestão de risco e dados'],
+  };
+  const [ptit,psub]=PAGES[ui.tab]||['',''];
 
-  // ── STATS BAR
-  html+=`<div class="stats-bar" style="margin:0 -20px">
-    ${[
-      ['P&L Total',fmt(stats?.totalPnl??0),(stats?.totalPnl??0)>=0?'#22c55e':'#ef4444'],
-      ['Win Rate',stats?`${stats.winRate}%`:'—',(stats?.winRate??0)>=50?'#22c55e':'#ef4444'],
-      ['Profit Factor',stats?.pf??'—',parseFloat(stats?.pf)>=1.5?'#22c55e':'#f59e0b'],
-      ['Hoje',fmt(dpnl),dpnl>=0?'#22c55e':'#ef4444'],
-      ['Stops hoje',`${stops}/${j.maxConsec}`,stops>=j.maxConsec?'#ef4444':stops>0?'#f59e0b':'#f1f5f9'],
-      ['Capital',`${c.currency}${j.capital}`,'#6366f1'],
-      ['Risco/op',`${fmt(RPT)} (${j.riskPct}%)`,'#94a3b8'],
-      ['Limite dia',`${fmt(MDL)} (${j.maxLossPct}%)`,'#f59e0b'],
-    ].map(([l,v,col])=>`<div style="flex-shrink:0"><div style="color:#334155;font-size:10px;font-weight:600">${l}</div><div style="color:${col};font-weight:700;font-size:15px">${v}</div></div>`).join('')}
-  </div>`;
+  let html=`<div class="shell">
+  <aside class="sidebar${ui.sbOpen?' open':''}" id="sb">
+    <div class="sb-brand">
+      <div class="sb-logo">Z</div>
+      <div style="font-weight:700;font-size:15px">Diário <span style="color:#22c55e">Zella</span></div>
+    </div>
+    <div class="sb-acct" onclick="toggleJournal()">
+      <div style="width:26px;height:26px;border-radius:7px;background:#22c55e22;display:flex;align-items:center;justify-content:center;font-size:13px">${c.icon}</div>
+      <div style="min-width:0;flex:1">
+        <div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.name}</div>
+        <div style="color:#4b5563;font-size:10px">${c.currency} · ${j.pairs.slice(0,3).join(', ')}</div>
+      </div>
+      <span style="color:#4b5563;font-size:11px">⇅</span>
+    </div>
+    ${NAV.map(n=>n.sec
+      ? `<div class="sb-sec">${n.sec}</div>`
+      : `<button class="sb-item${ui.tab===n.id?' active':''}" onclick="setTab('${n.id}')"><span style="font-size:14px">${n.ic}</span>${n.label}${n.badge?`<span class="sb-badge">${n.badge}</span>`:''}</button>`).join('')}
+    <div style="margin-top:auto;padding:14px 12px;border-top:1px solid #1a1f26;display:flex;gap:7px">
+      <label class="btn-ghost" style="font-size:11px;padding:6px 10px;cursor:pointer;flex:1;text-align:center">📥 Importar<input type="file" accept=".json" onchange="importJ(event)" style="display:none;width:auto"></label>
+      <button class="btn-ghost" onclick="exportJ()" style="font-size:11px;padding:6px 10px;flex:1">📤 Backup</button>
+    </div>
+  </aside>
 
-  // ── ALERT
-  const hitStops=stops>=j.maxConsec;
-  const hitLoss=dpnl<=-MDL;
+  <main class="main">
+    <div class="sb-toggle">
+      <button class="btn-ghost" onclick="toggleSb()" style="padding:7px 12px">☰</button>
+      <div style="font-weight:700">${ptit}</div>
+    </div>
+    <div class="page-head">
+      <div class="page-title">${ptit}</div>
+      <div class="page-sub">${psub}</div>
+    </div>
+
+    <div class="stats-bar">
+      ${[
+        ['P&L Total',fmt(stats?.totalPnl??0),(stats?.totalPnl??0)>=0?'#22c55e':'#ef4444'],
+        ['Win Rate',stats?`${stats.winRate}%`:'—',(stats?.winRate??0)>=50?'#22c55e':'#ef4444'],
+        ['Profit Factor',stats?.pf??'—',parseFloat(stats?.pf)>=1.5?'#22c55e':'#f59e0b'],
+        ['Hoje',fmt(dpnl),dpnl>=0?'#22c55e':'#ef4444'],
+        ['Stops hoje',`${stops}/${j.maxConsec}`,stops>=j.maxConsec?'#ef4444':stops>0?'#f59e0b':'#e8eaed'],
+        ['Capital',`${c.currency}${j.capital}`,'#22c55e'],
+        ['Risco/op',fmt(RPT),'#9aa3ad'],
+        ['Limite dia',fmt(MDL),'#f59e0b'],
+      ].map(([l,v,col])=>`<div style="flex-shrink:0"><div style="color:#4b5563;font-size:10px;font-weight:600">${l}</div><div style="color:${col};font-weight:700;font-size:15px;margin-top:2px">${v}</div></div>`).join('')}
+    </div>`;
+
+  const hitStops=stops>=j.maxConsec, hitLoss=dpnl<=-MDL;
   if(hitStops||hitLoss){
-    html+=`<div class="alert" style="margin-top:12px"><span style="font-size:20px">🛑</span><div><div style="color:#ef4444;font-weight:700;font-size:14px">ENCERRE O DIA AGORA</div><div style="color:#fca5a5;font-size:12px;margin-top:2px">${hitStops?`${stops} stops atingidos (limite: ${j.maxConsec}). `:''}${hitLoss?`Perda de ${fmt(dpnl)} atingida (limite: ${fmt(MDL)}). `:''}Fecha o gráfico. Vai fazer exercício ou tocar violão. 🎸</div></div></div>`;
+    html+=`<div class="alert"><span style="font-size:20px">🛑</span><div><div style="color:#ef4444;font-weight:700;font-size:14px">ENCERRE O DIA AGORA</div><div style="color:#fca5a5;font-size:12px;margin-top:2px">${hitStops?`${stops} stops atingidos (limite: ${j.maxConsec}). `:''}${hitLoss?`Perda de ${fmt(dpnl)} atingida (limite: ${fmt(MDL)}). `:''}Fecha o gráfico. Vai fazer exercício ou tocar violão. 🎸</div></div></div>`;
   }
-
-  // ── TABS
-  html+=`<div style="background:#080f23;border-bottom:1px solid #1e3a5f;display:flex;overflow-x:auto;margin:0 -20px">
-    ${[['journal','📝 Diário'],['calendar','📅 Calendário'],['stats','📊 Stats'],['config','⚙️ Config']].map(([id,label])=>`<button class="tab${ui.tab===id?' active':''}" onclick="setTab('${id}')">${label}</button>`).join('')}
-  </div><div style="max-width:900px;margin:0 auto;padding-top:20px">`;
 
   // ══════════ JOURNAL
   if(ui.tab==='journal'){
     if(!ui.showForm){
       html+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <div style="color:#475569;font-size:12px">${j.trades.length} trades · ${tod.length} hoje</div>
-        <button class="btn-primary" onclick="showForm()">+ Registrar Trade</button>
+        <div style="color:#475569;font-size:12px">${j.trades.length} trades · ${tod.length} hoje${j.trades.filter(t=>t.importado&&!t.revisado).length?` · <b style="color:#f59e0b">${j.trades.filter(t=>t.importado&&!t.revisado).length} a revisar</b>`:''}</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-ghost" onclick="abrirImport()">📥 Importar CSV</button>
+          <button class="btn-primary" onclick="showForm()">+ Registrar Trade</button>
+        </div>
       </div>`;
     } else { html+=renderForm(RPT); }
 
@@ -388,6 +440,7 @@ function render(){
       ${isLiq()
         ?`<select onchange="setFilter('filtrosOk',this.value)" style="width:auto"><option value="">Filtros: Todos</option><option value="sim"${ui.filter.filtrosOk==='sim'?' selected':''}>✓ Todos atendidos</option><option value="nao"${ui.filter.filtrosOk==='nao'?' selected':''}>✗ Incompletos</option></select>`
         :`<select onchange="setFilter('setup',this.value)" style="width:auto"><option value="">Setup: Todos</option>${j.setups.map(o=>`<option value="${o}"${ui.filter.setup===o?'selected':''}>${o}</option>`).join('')}</select>`}
+      <select onchange="setFilter('revisar',this.value)" style="width:auto"><option value="">Revisão: Todos</option><option value="sim"${ui.filter.revisar==='sim'?' selected':''}>⚠ A revisar</option></select>
       <select onchange="setFilter('janela',this.value)" style="width:auto"><option value="">Horário: Todos</option>${JANELAS.map(x=>`<option value="${escHtml(x.nome)}"${ui.filter.janela===x.nome?' selected':''}>${escHtml(x.nome)}</option>`).join('')}</select>
       <select onchange="setFilter('resultado',this.value)" style="width:auto"><option value="">Resultado: Todos</option>${j.results.map(o=>`<option value="${o}"${ui.filter.resultado===o?'selected':''}>${o}</option>`).join('')}</select>
       ${j.pairs.length>1?`<select onchange="setFilter('par',this.value)" style="width:auto"><option value="">Ativo: Todos</option>${[...new Set(j.trades.map(t=>t.par).filter(Boolean))].map(o=>`<option value="${o}"${ui.filter.par===o?'selected':''}>${o}</option>`).join('')}</select>`:''}
@@ -396,13 +449,13 @@ function render(){
       ${(Object.entries(ui.filter).some(([k,v])=>Array.isArray(v)?v.length:v))?`<button class="btn-ghost" onclick="clearFilter()" style="font-size:11px">✕ Limpar tudo</button>`:''}
       <span style="color:#334155;font-size:11px">${filtered.length} trade${filtered.length!==1?'s':''}</span>
     </div>
-    ${ui._dayFilter?`<div style="background:#1e3a5f55;border:1px solid #6366f155;border-radius:8px;padding:8px 12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;font-size:12px"><span>📅 Mostrando só o dia <b>${ui._dayFilter}</b></span><button class="btn-ghost" onclick="ui._dayFilter=null;render()" style="font-size:11px;padding:4px 10px">✕ Ver todos</button></div>`:''}`;
+    ${ui._dayFilter?`<div style="background:#1e3a5f55;border:1px solid #22c55e55;border-radius:8px;padding:8px 12px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;font-size:12px"><span>📅 Mostrando só o dia <b>${ui._dayFilter}</b></span><button class="btn-ghost" onclick="ui._dayFilter=null;render()" style="font-size:11px;padding:4px 10px">✕ Ver todos</button></div>`:''}`;
 
     if(isLiq()&&(j.confluences.length||j.filters.length||j.regions.length||j.triggers.length)){
       html+=`<div style="background:#0d1526;border-radius:10px;padding:12px 14px;border:1px solid #1e3a5f;margin-bottom:14px;display:grid;gap:12px">
         ${j.regions.length?`<div>
-          <div style="color:#8b5cf6;font-size:10px;font-weight:700;letter-spacing:0.6px;margin-bottom:7px">📍 FILTRAR POR REGIÃO ${ui.filter.regioes.length?`(${ui.filter.regioes.length} marcadas)`:'(selecione uma ou mais)'}</div>
-          ${chips(j.regions,ui.filter.regioes,'toggleFilterRegiao','#8b5cf6')}
+          <div style="color:#16a34a;font-size:10px;font-weight:700;letter-spacing:0.6px;margin-bottom:7px">📍 FILTRAR POR REGIÃO ${ui.filter.regioes.length?`(${ui.filter.regioes.length} marcadas)`:'(selecione uma ou mais)'}</div>
+          ${chips(j.regions,ui.filter.regioes,'toggleFilterRegiao','#16a34a')}
         </div>`:''}
         ${j.triggers.length?`<div>
           <div style="color:#06b6d4;font-size:10px;font-weight:700;letter-spacing:0.6px;margin-bottom:7px">⚡ FILTRAR POR GATILHO ${ui.filter.gatilhos.length?`(${ui.filter.gatilhos.length} marcados)`:'(selecione um ou mais)'}</div>
@@ -438,21 +491,22 @@ function render(){
           <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
             ${badge(t.resultado,rc)}
             <span style="font-weight:700;color:#f1f5f9;font-size:14px">${escHtml(t.par||'')}</span>
-            ${(t.regioes||[]).map(r=>badge(r,'#8b5cf6')).join('')}
+            ${(t.regioes||[]).map(r=>badge(r,'#16a34a')).join('')}
             ${(t.gatilhos||[]).map(g=>badge(g,'#06b6d4')).join('')}
             ${t.setup?badge(t.setup,'#334155'):''}
             ${t.direcao?badge(t.direcao,t.direcao==='Compra'?'#22c55e':'#ef4444'):''}
             ${fok===true?badge('Filtros ✓','#22c55e'):fok===false?badge('Filtros ✗','#ef4444'):''}
             ${(t.confluencias||[]).length?badge(`${t.confluencias.length} confl.`,'#f59e0b'):''}
+            ${t.importado&&!t.revisado?badge('a revisar','#f59e0b'):''}
             ${t.janela?badge(t.janela+(t.hora_entrada?' · '+t.hora_entrada:''),janelaCor(t.janela)):''}
-            ${t.pontos_stop&&t.pontos_gain?badge(`${t.pontos_stop}→${t.pontos_gain}pts`,'#6366f1'):''}
+            ${t.pontos_stop&&t.pontos_gain?badge(`${t.pontos_stop}→${t.pontos_gain}pts`,'#22c55e'):''}
             ${t.saiu_parcial?badge(`Parcial ${t.parcial_pct||''}${t.parcial_pct?'%':''}`,'#f59e0b'):''}
             <span style="color:#475569;font-size:11px">${escHtml(t.data||'')}${weekday(t.data)?' · '+weekday(t.data):''}</span>
             ${t.sessao?`<span style="color:#475569;font-size:11px">· ${escHtml(t.sessao)}</span>`:''}
             ${t.emocao?`<span style="color:${ec};font-size:11px;font-weight:600">● ${escHtml(t.emocao)}</span>`:''}
             ${t.moveu_be_cedo?badge('BE precoce','#f59e0b'):''}
             ${!t.seguiu_regras?badge('Fora do plano','#ef4444'):''}
-            ${t.imagem?'<span style="color:#6366f1;font-size:11px">📷</span>':''}
+            ${t.imagem?'<span style="color:#22c55e;font-size:11px">📷</span>':''}
           </div>
           <div style="display:flex;align-items:center;gap:10px">
             <span style="color:${rc};font-weight:700;font-size:15px">${fmt(t.pnl)}</span>
@@ -469,9 +523,10 @@ function render(){
   else if(ui.tab==='stats'){html+=renderStats();}
   else if(ui.tab==='config'){html+=renderConfig();}
 
-  html+=`</div>
+  html+=`</main></div>
+  ${renderImport()}
   <div style="position:fixed;bottom:20px;right:20px;z-index:200">
-    <button onclick="openClaude()" class="btn-primary" style="border-radius:50px;padding:12px 20px;box-shadow:0 4px 20px #6366f166">💬 Perguntar à Zella</button>
+    <button onclick="openClaude()" class="btn-primary" style="border-radius:50px;padding:12px 20px;box-shadow:0 4px 20px #22c55e66">💬 Perguntar à Zella</button>
   </div>`;
 
   app.innerHTML=html;
@@ -481,7 +536,7 @@ function render(){
 function renderForm(RPT){
   const f=ui.formData,j=J(),c=CFG();
   let html=`<div class="card" style="margin-bottom:16px">
-    <div style="color:#6366f1;font-size:11px;font-weight:700;letter-spacing:0.6px;margin-bottom:14px">📋 ${ui._editIdx!=null?'EDITAR TRADE':'NOVO TRADE'}</div>`;
+    <div style="color:#22c55e;font-size:11px;font-weight:700;letter-spacing:0.6px;margin-bottom:14px">📋 ${ui._editIdx!=null?'EDITAR TRADE':'NOVO TRADE'}</div>`;
 
   {
 
@@ -489,14 +544,14 @@ function renderForm(RPT){
     const allOk=fTotal>0&&fCount===fTotal;
     html+=`<div style="display:grid;gap:12px">
       ${j.paused.includes(f.par)?`<div style="background:#2d1800;border:1px solid #f59e0b44;border-radius:8px;padding:10px 12px"><span style="color:#f59e0b;font-size:12px">⚠ ${f.par} está pausado</span></div>`:''}
-      ${f.resumo_ia?`<div style="background:#060d1f;border-radius:8px;padding:12px 14px;border:1px solid #6366f155"><div style="color:#6366f1;font-size:10px;font-weight:700;margin-bottom:6px">⚡ ANÁLISE IA</div><div style="color:#cbd5e1;font-size:13px;line-height:1.6">${escHtml(f.resumo_ia)}</div>${f.score?`<div style="color:#94a3b8;font-size:11px;margin-top:6px">Score: ${f.score}/10</div>`:''}</div>`:''}
+      ${f.resumo_ia?`<div style="background:#060d1f;border-radius:8px;padding:12px 14px;border:1px solid #22c55e55"><div style="color:#22c55e;font-size:10px;font-weight:700;margin-bottom:6px">⚡ ANÁLISE IA</div><div style="color:#cbd5e1;font-size:13px;line-height:1.6">${escHtml(f.resumo_ia)}</div>${f.score?`<div style="color:#94a3b8;font-size:11px;margin-top:6px">Score: ${f.score}/10</div>`:''}</div>`:''}
 
       ${isLiq()
         ?`<div class="grid2">
             <div><label class="label">ATIVO *</label>${sel(f.par,j.pairs,"setFD('par',this.value)",'Selecione')}</div>
             <div><label class="label">RESULTADO *</label>${sel(f.resultado,j.results,"setFD('resultado',this.value)",'Selecione')}</div>
           </div>
-          <div><label class="label">📍 REGIÃO * ${(f.regioes||[]).length?`(${f.regioes.length})`:'— pode marcar mais de uma'}</label>${chips(j.regions,f.regioes,'toggleRegiao','#8b5cf6')}</div>
+          <div><label class="label">📍 REGIÃO * ${(f.regioes||[]).length?`(${f.regioes.length})`:'— pode marcar mais de uma'}</label>${chips(j.regions,f.regioes,'toggleRegiao','#16a34a')}</div>
           <div><label class="label">⚡ GATILHO M1 * ${(f.gatilhos||[]).length?`(${f.gatilhos.length})`:'— pode marcar mais de um'}</label>${chips(j.triggers,f.gatilhos,'toggleGatilho','#06b6d4')}</div>`
         :`<div class="grid3">
             <div><label class="label">PAR *</label>${sel(f.par,j.pairs,"setFD('par',this.value)",'Selecione')}</div>
@@ -526,6 +581,7 @@ function renderForm(RPT){
 
       <div class="grid4">
         <div><label class="label">DIREÇÃO</label>${sel(f.direcao,['Compra','Venda'],"setFD('direcao',this.value)",'—')}</div>
+        <div><label class="label">QUANTIDADE</label>${inp(f.qtd,"setFD('qtd',this.value)",'ex: 10','number')}</div>
         <div>
           <label class="label">P&L (${cur()}) ${f.resultado==='Loss'?'<span style="color:#ef4444">— será salvo negativo</span>':f.resultado==='Win'?'<span style="color:#22c55e">— será salvo positivo</span>':(f.resultado==='BE'||f.resultado==='BE e depois andou')?'<span style="color:#f59e0b">— BE = zero</span>':''}</label>
           ${(f.resultado==='BE'||f.resultado==='BE e depois andou')
@@ -545,8 +601,8 @@ function renderForm(RPT){
         </div>
       </div>
 
-      <div style="background:#060d1f;border-radius:8px;padding:12px;border:1px solid #6366f133">
-        <div style="color:#6366f1;font-size:10px;font-weight:700;letter-spacing:0.6px;margin-bottom:9px">📏 PONTOS DA OPERAÇÃO</div>
+      <div style="background:#060d1f;border-radius:8px;padding:12px;border:1px solid #22c55e33">
+        <div style="color:#22c55e;font-size:10px;font-weight:700;letter-spacing:0.6px;margin-bottom:9px">📏 PONTOS DA OPERAÇÃO</div>
         <div class="grid3">
           <div><label class="label">STOP (pontos)</label><input type="number" value="${escHtml(String(f.pontos_stop||''))}" oninput="setPontos('pontos_stop',this.value)" placeholder="ex: 150"></div>
           <div><label class="label">ALVO / GAIN (pontos)</label><input type="number" value="${escHtml(String(f.pontos_gain||''))}" oninput="setPontos('pontos_gain',this.value)" placeholder="ex: 450"></div>
@@ -601,8 +657,8 @@ function renderForm(RPT){
 }
 
 function renderFiboFields(f){
-  return `<div style="background:#060d1f;border-radius:10px;padding:14px;border:1px solid #6366f133">
-    <div class="section-label" style="color:#6366f1">🎯 DADOS DO BACKTEST FIBO</div>
+  return `<div style="background:#060d1f;border-radius:10px;padding:14px;border:1px solid #22c55e33">
+    <div class="section-label" style="color:#22c55e">🎯 DADOS DO BACKTEST FIBO</div>
     <div style="display:grid;gap:12px">
       <div><label class="label">CONFLUÊNCIAS FIBO</label>${chips(FIBO_CONF,f.bt_confluencias,'toggleConf')}</div>
       <div class="grid2">
@@ -626,7 +682,7 @@ function renderTradeDetail(t){
   const missing=j.filters.filter(x=>!(t.filtros||[]).includes(x));
   return `<div class="trade-detail">
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px">
-      ${[['TF',t.timeframe||'—'],['Entrada',t.hora_entrada||'—'],['Saída',t.hora_saida||'—'],['Duração',duracao(t.hora_entrada,t.hora_saida)||'—'],['Stop',t.pontos_stop?`${t.pontos_stop} pts`:'—'],['Alvo',t.pontos_gain?`${t.pontos_gain} pts`:'—'],['RR plan.',rrPlan(t)?`1:${rrPlan(t)}`:'—'],['RR real',t.rr_realizado?`1:${t.rr_realizado}`:'—'],['Parcial',t.saiu_parcial?`Sim ${t.parcial_pct?t.parcial_pct+'%':''}`:'Não'],['Regras',t.seguiu_regras?'Sim ✓':'Não ✗']].map(([l,v])=>`<div style="background:#060d1f;border-radius:8px;padding:8px 10px"><div style="color:#475569;font-size:10px;margin-bottom:2px">${l}</div><div style="color:#f1f5f9;font-size:12px;font-weight:600">${escHtml(String(v))}</div></div>`).join('')}
+      ${[['TF',t.timeframe||'—'],['Entrada',t.hora_entrada||'—'],['Saída',t.hora_saida||'—'],['Duração',duracao(t.hora_entrada,t.hora_saida)||'—'],['Qtd',t.qtd??'—'],['Preço ent.',t.preco_entrada??'—'],['Preço saí.',t.preco_saida??'—'],['Pts result.',t.pontos_resultado??'—'],['Stop',t.pontos_stop?`${t.pontos_stop} pts`:'—'],['Alvo',t.pontos_gain?`${t.pontos_gain} pts`:'—'],['RR plan.',rrPlan(t)?`1:${rrPlan(t)}`:'—'],['RR real',t.rr_realizado?`1:${t.rr_realizado}`:'—'],['Parcial',t.saiu_parcial?`Sim ${t.parcial_pct?t.parcial_pct+'%':''}`:'Não'],['Regras',t.seguiu_regras?'Sim ✓':'Não ✗']].map(([l,v])=>`<div style="background:#060d1f;border-radius:8px;padding:8px 10px"><div style="color:#475569;font-size:10px;margin-bottom:2px">${l}</div><div style="color:#f1f5f9;font-size:12px;font-weight:600">${escHtml(String(v))}</div></div>`).join('')}
     </div>
 
     ${j.filters.length?`<div style="background:#060d1f;border-radius:8px;padding:10px 12px;border:1px solid ${fok?'#22c55e33':'#ef444433'}">
@@ -642,8 +698,8 @@ function renderTradeDetail(t){
       <div style="display:flex;flex-wrap:wrap;gap:5px">${t.confluencias.map(x=>`<span style="background:#f59e0b22;color:#fbbf24;font-size:11px;padding:2px 8px;border-radius:10px">${escHtml(x)}</span>`).join('')}</div>
     </div>`:''}
 
-    ${c.hasFibo&&t.setup==='Fibo'&&(t.bt_ate_onde_foi||t.bt_confluencias?.length)?`<div style="background:#060d1f;border-radius:8px;padding:10px 12px;border:1px solid #6366f133">
-      <div style="color:#6366f1;font-size:10px;font-weight:700;margin-bottom:6px">🎯 DADOS FIBO</div>
+    ${c.hasFibo&&t.setup==='Fibo'&&(t.bt_ate_onde_foi||t.bt_confluencias?.length)?`<div style="background:#060d1f;border-radius:8px;padding:10px 12px;border:1px solid #22c55e33">
+      <div style="color:#22c55e;font-size:10px;font-weight:700;margin-bottom:6px">🎯 DADOS FIBO</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:#94a3b8">
         ${t.bt_confluencias?.length?`<span>Confluências: ${t.bt_confluencias.join(', ')}</span>`:''}
         ${t.bt_ate_onde_foi?`<span>Foi até: ${t.bt_ate_onde_foi}</span>`:''}
@@ -656,7 +712,7 @@ function renderTradeDetail(t){
       ${t.acertos?`<div style="background:#052e16;border-radius:8px;padding:10px 12px;border:1px solid #22c55e33"><div style="color:#22c55e;font-size:10px;font-weight:700;margin-bottom:4px">✓ ACERTOS</div><div style="color:#bbf7d0;font-size:12px">${escHtml(t.acertos)}</div></div>`:''}
       ${t.erros?`<div style="background:#1c0606;border-radius:8px;padding:10px 12px;border:1px solid #ef444433"><div style="color:#ef4444;font-size:10px;font-weight:700;margin-bottom:4px">✗ ERROS</div><div style="color:#fca5a5;font-size:12px">${escHtml(t.erros)}</div></div>`:''}
     </div>`:''}
-    ${t.resumo_ia?`<div style="background:#060d1f;border-radius:8px;padding:10px 12px;border:1px solid #6366f133"><div style="color:#6366f1;font-size:10px;font-weight:700;margin-bottom:4px">⚡ ANÁLISE IA</div><div style="color:#cbd5e1;font-size:12px;line-height:1.6">${escHtml(t.resumo_ia)}</div></div>`:''}
+    ${t.resumo_ia?`<div style="background:#060d1f;border-radius:8px;padding:10px 12px;border:1px solid #22c55e33"><div style="color:#22c55e;font-size:10px;font-weight:700;margin-bottom:4px">⚡ ANÁLISE IA</div><div style="color:#cbd5e1;font-size:12px;line-height:1.6">${escHtml(t.resumo_ia)}</div></div>`:''}
     ${t.notas?`<div style="color:#64748b;font-size:12px;font-style:italic">📝 ${escHtml(t.notas)}</div>`:''}
     ${t.imagem?`<div><div style="color:#475569;font-size:10px;margin-bottom:4px">📷 PRINT DO GRÁFICO</div><img src="${t.imagem}" class="img-preview"></div>`:''}
   </div>`;
@@ -665,7 +721,7 @@ function renderTradeDetail(t){
 // ── CONFIG ─────────────────────────────────────────────────────────
 function renderConfig(){
   const j=J(),c=CFG();
-  function listSection(title,icon,items,key,pausable,color='#6366f1'){
+  function listSection(title,icon,items,key,pausable,color='#22c55e'){
     return `<div class="card">
       <div class="section-label" style="color:${color}">${icon} ${title}</div>
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
@@ -683,13 +739,13 @@ function renderConfig(){
   }
 
   return `<div style="display:grid;gap:4px">
-    <div class="card" style="background:#1e3a5f22;border-color:#6366f155;margin-bottom:4px">
+    <div class="card" style="background:#1e3a5f22;border-color:#22c55e55;margin-bottom:4px">
       <div style="color:#94a3b8;font-size:12px;line-height:1.6">
-        ⚙️ Configurações do diário <b style="color:#6366f1">${c.icon} ${c.name}</b>. Cada diário tem listas e trades independentes.
+        ⚙️ Configurações do diário <b style="color:#22c55e">${c.icon} ${c.name}</b>. Cada diário tem listas e trades independentes.
       </div>
     </div>
     ${listSection('ATIVOS','💱',j.pairs,'pairs',true)}
-    ${isLiq()?listSection('REGIÕES','📍',j.regions,'regions',false,'#8b5cf6'):''}
+    ${isLiq()?listSection('REGIÕES','📍',j.regions,'regions',false,'#16a34a'):''}
     ${isLiq()?listSection('GATILHOS (M1)','⚡',j.triggers,'triggers',false,'#06b6d4'):''}
     ${isLiq()?listSection('FILTROS OBRIGATÓRIOS','✓',j.filters,'filters',false,'#22c55e'):''}
     ${isLiq()?listSection('CONFLUÊNCIAS','🔗',j.confluences,'confluences',false,'#f59e0b'):''}
@@ -747,7 +803,7 @@ function renderStats(){
       ['PROFIT FACTOR',s.pf,parseFloat(s.pf)>=1.5?'#22c55e':'#f59e0b',''],
       ['RR MÉDIO',`1:${s.avgRR}`,'#f1f5f9',''],
       ['TRADES',j.trades.length,'#f1f5f9',''],
-      ['SCORE MÉDIO',`${(j.trades.reduce((a,t)=>a+(t.score||5),0)/j.trades.length).toFixed(1)}/10`,'#6366f1',''],
+      ['SCORE MÉDIO',`${(j.trades.reduce((a,t)=>a+(t.score||5),0)/j.trades.length).toFixed(1)}/10`,'#22c55e',''],
     ].map(([l,v,col,sub])=>`<div class="metric"><div style="color:#475569;font-size:10px;font-weight:600;margin-bottom:3px">${l}</div><div style="color:${col};font-weight:700;font-size:18px">${v}</div>${sub?`<div style="color:#475569;font-size:11px;margin-top:2px">${sub}</div>`:''}</div>`).join('')}
   </div>`;
 
@@ -768,7 +824,7 @@ function renderStats(){
       return{label,w,l,p,wr:ts.length?Math.round((w/ts.length)*100):0};
     }).sort((a,b)=>b.p-a.p);
   }
-  function tt(title,rows,color='#6366f1'){
+  function tt(title,rows,color='#22c55e'){
     if(!rows.length)return'';
     return`<div class="card"><div class="section-label" style="color:${color}">${title}</div>
       <div style="display:grid;grid-template-columns:1fr 40px 40px 80px 50px;gap:8px;margin-bottom:6px">${['','W','L','P&L','WR'].map(h=>`<span style="color:#475569;font-size:10px;font-weight:700">${h}</span>`).join('')}</div>
@@ -808,7 +864,7 @@ function renderStats(){
   }
 
   if(isLiq()){
-    html+=tt('📍 POR REGIÃO',gsArr(j.trades,'regioes'),'#8b5cf6');
+    html+=tt('📍 POR REGIÃO',gsArr(j.trades,'regioes'),'#16a34a');
     html+=tt('⚡ POR GATILHO',gsArr(j.trades,'gatilhos'),'#06b6d4');
     // combo
     const combo={};
@@ -858,7 +914,7 @@ function renderStats(){
           <div style="color:#475569;font-size:11px">WR ${a.winRate}% · PF ${a.pf} · RR 1:${a.avgRR}</div>
         </div>
         <div style="background:#060d1f;border-radius:8px;padding:12px">
-          <div style="color:#6366f1;font-size:11px;font-weight:700;margin-bottom:6px">SEM PARCIAL (${sp.length})</div>
+          <div style="color:#22c55e;font-size:11px;font-weight:700;margin-bottom:6px">SEM PARCIAL (${sp.length})</div>
           <div style="color:${(b?.totalPnl??0)>=0?'#22c55e':'#ef4444'};font-weight:700;font-size:16px">${fmt(b?.totalPnl??0)}</div>
           <div style="color:#475569;font-size:11px">WR ${b?.winRate??0}% · PF ${b?.pf??'—'} · RR 1:${b?.avgRR??'—'}</div>
         </div>
@@ -872,9 +928,9 @@ function renderStats(){
     const avgStop=(comPts.reduce((a,t)=>a+Number(t.pontos_stop),0)/comPts.length).toFixed(0);
     const avgGain=(comPts.reduce((a,t)=>a+Number(t.pontos_gain),0)/comPts.length).toFixed(0);
     const avgRRp=(comPts.reduce((a,t)=>a+parseFloat(rrPlan(t)),0)/comPts.length).toFixed(2);
-    html+=`<div class="card"><div class="section-label" style="color:#6366f1">📏 PONTOS DAS OPERAÇÕES (${comPts.length})</div>
+    html+=`<div class="card"><div class="section-label" style="color:#22c55e">📏 PONTOS DAS OPERAÇÕES (${comPts.length})</div>
       <div class="grid3">
-        ${[['STOP MÉDIO',`${avgStop} pts`,'#ef4444'],['ALVO MÉDIO',`${avgGain} pts`,'#22c55e'],['RR PLANEJADO MÉDIO',`1 : ${avgRRp}`,'#6366f1']].map(([l,v,col])=>`<div style="background:#060d1f;border-radius:8px;padding:10px 12px"><div style="color:#475569;font-size:10px">${l}</div><div style="color:${col};font-weight:700;font-size:16px">${v}</div></div>`).join('')}
+        ${[['STOP MÉDIO',`${avgStop} pts`,'#ef4444'],['ALVO MÉDIO',`${avgGain} pts`,'#22c55e'],['RR PLANEJADO MÉDIO',`1 : ${avgRRp}`,'#22c55e']].map(([l,v,col])=>`<div style="background:#060d1f;border-radius:8px;padding:10px 12px"><div style="color:#475569;font-size:10px">${l}</div><div style="color:${col};font-weight:700;font-size:16px">${v}</div></div>`).join('')}
       </div>`;
     // faixas de RR
     const faixas={};
@@ -889,7 +945,7 @@ function renderStats(){
       return{label,w,l,p,wr:ts.length?Math.round((w/ts.length)*100):0};
     }).sort((a,b)=>a.label.localeCompare(b.label));
     html+=`</div>`;
-    if(fr.length>1)html+=tt('📊 POR FAIXA DE RR PLANEJADO',fr,'#6366f1');
+    if(fr.length>1)html+=tt('📊 POR FAIXA DE RR PLANEJADO',fr,'#22c55e');
   }
 
   html+=tt('🕐 POR PERÍODO DO PREGÃO',gs(j.trades,'janela').sort((a,b)=>JANELAS.findIndex(x=>x.nome===a.label)-JANELAS.findIndex(x=>x.nome===b.label)),'#06b6d4');
@@ -917,6 +973,230 @@ function renderStats(){
   return html;
 }
 
+
+
+// ══════════════════════════════════════════════════════════════════
+// IMPORTAÇÃO DE CSV
+// ══════════════════════════════════════════════════════════════════
+const CAMPOS=[
+  {k:'data',   nome:'Data',           chaves:['data','date','abertura','dia']},
+  {k:'hora_entrada',nome:'Hora entrada',chaves:['abertura','entrada','hora inicial','inicio','open']},
+  {k:'hora_saida',  nome:'Hora saída', chaves:['fechamento','saida','saída','hora final','close']},
+  {k:'par',    nome:'Ativo',           chaves:['ativo','papel','instrumento','symbol','contrato']},
+  {k:'qtd',    nome:'Quantidade',      chaves:['qtd','quantidade','lotes','contratos','volume']},
+  {k:'direcao',nome:'Direção',         chaves:['qtd','lado','side','tipo','direcao','direção','c/v','operacao']},
+  {k:'pnl',    nome:'Resultado R$',    chaves:['res. operação','res operacao','resultado','result','lucro','financeiro','líquido','liquido','p&l','pnl']},
+  {k:'pontos', nome:'Resultado pts',   chaves:['pts','pontos','res. intervalo (%)','intervalo']},
+  {k:'preco_entrada',nome:'Preço entrada',chaves:['preço compra','preco compra','preço de entrada','entrada']},
+  {k:'preco_saida',  nome:'Preço saída',  chaves:['preço venda','preco venda','preço de saída','saida']},
+];
+
+function splitCSVLine(line,delim){
+  const out=[];let cur='',q=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(c==='"'){ if(q&&line[i+1]==='"'){cur+='"';i++;} else q=!q; }
+    else if(c===delim&&!q){out.push(cur);cur='';}
+    else cur+=c;
+  }
+  out.push(cur);
+  return out.map(x=>x.trim().replace(/^"|"$/g,''));
+}
+function detectDelim(txt){
+  const l=txt.split(/\r?\n/).find(x=>x.trim());
+  if(!l)return ';';
+  const c={';':0,',':0,'\t':0};
+  Object.keys(c).forEach(d=>c[d]=l.split(d).length);
+  return Object.entries(c).sort((a,b)=>b[1]-a[1])[0][0];
+}
+function parseCSV(txt){
+  txt=txt.replace(/^\uFEFF/,'');
+  const delim=detectDelim(txt);
+  const linhas=txt.split(/\r?\n/).filter(x=>x.trim());
+  if(!linhas.length)return null;
+  // acha a linha de cabeçalho (a que tem mais colunas preenchidas)
+  let hi=0,best=0;
+  for(let i=0;i<Math.min(8,linhas.length);i++){
+    const n=splitCSVLine(linhas[i],delim).filter(Boolean).length;
+    if(n>best){best=n;hi=i;}
+  }
+  const head=splitCSVLine(linhas[hi],delim);
+  const rows=linhas.slice(hi+1).map(l=>splitCSVLine(l,delim)).filter(r=>r.filter(Boolean).length>1);
+  return{head,rows,delim};
+}
+function autoMap(head){
+  const m={};
+  const usados=new Set();
+  CAMPOS.forEach(f=>{
+    let melhor=-1,score=0;
+    head.forEach((h,i)=>{
+      const hl=h.toLowerCase().trim();
+      if(!hl)return;
+      f.chaves.forEach(c=>{
+        let sc=0;
+        if(hl===c)sc=100;
+        else if(hl.startsWith(c))sc=70;
+        else if(hl.includes(c))sc=50;
+        if(sc>score&&(!usados.has(i)||f.k==='direcao'||f.k==='data')){score=sc;melhor=i;}
+      });
+    });
+    if(melhor>=0&&score>0){m[f.k]=melhor;if(f.k!=='direcao'&&f.k!=='data')usados.add(melhor);}
+  });
+  return m;
+}
+function numBR(v){
+  if(v===undefined||v===null)return null;
+  let t=String(v).replace(/R\$|\s|pts|%/gi,'').trim();
+  if(!t)return null;
+  const neg=/^\(.*\)$/.test(t)||t.includes('-');
+  t=t.replace(/[()\-]/g,'');
+  if(t.includes(',')&&t.includes('.'))t=t.replace(/\./g,'').replace(',','.');
+  else if(t.includes(','))t=t.replace(',','.');
+  const n=parseFloat(t);
+  if(isNaN(n))return null;
+  return neg?-Math.abs(n):n;
+}
+function extraiData(v){
+  if(!v)return '';
+  const m=String(v).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if(m){let y=m[3];if(y.length===2)y='20'+y;return `${m[1].padStart(2,'0')}/${m[2].padStart(2,'0')}/${y}`;}
+  const iso=String(v).match(/(\d{4})-(\d{2})-(\d{2})/);
+  if(iso)return `${iso[3]}/${iso[2]}/${iso[1]}`;
+  return '';
+}
+function extraiHora(v){
+  if(!v)return '';
+  const m=String(v).match(/(\d{1,2}):(\d{2})/);
+  return m?`${m[1].padStart(2,'0')}:${m[2]}`:'';
+}
+function extraiDirecao(v){
+  const t=String(v||'').toUpperCase();
+  if(/\bC\b|COMPRA|BUY|LONG/.test(t))return 'Compra';
+  if(/\bV\b|VENDA|SELL|SHORT/.test(t))return 'Venda';
+  return '';
+}
+function linhaParaTrade(r,map){
+  const g=k=>map[k]!==undefined?r[map[k]]:'';
+  const pnl=numBR(g('pnl'));
+  const pts=numBR(g('pontos'));
+  const t=emptyForm();
+  t.data=extraiData(g('data'))||extraiData(g('hora_entrada'))||today();
+  t.hora_entrada=extraiHora(g('hora_entrada'));
+  t.hora_saida=extraiHora(g('hora_saida'));
+  t.janela=classifyJanela(t.hora_entrada);
+  const ativo=String(g('par')||'').toUpperCase().replace(/[^A-Z]/g,'');
+  t.par=J().pairs.find(p=>ativo.startsWith(p))||ativo.slice(0,6)||J().pairs[0]||'';
+  t.direcao=extraiDirecao(g('direcao'))||extraiDirecao(g('qtd'));
+  t.qtd=numBR(g('qtd'));
+  t.preco_entrada=numBR(g('preco_entrada'));
+  t.preco_saida=numBR(g('preco_saida'));
+  t.resultado=pnl===null?'':pnl>0?'Win':pnl<0?'Loss':'BE';
+  t.pnl=pnl===null?0:pnl;
+  t.pontos_resultado=pts;
+  t.importado=true;
+  t.revisado=false;
+  return t;
+}
+function chaveTrade(t){return `${t.data}|${t.hora_entrada}|${Number(t.pnl).toFixed(2)}`;}
+
+function abrirImport(){
+  imp={etapa:'arquivo',head:[],rows:[],map:{},nome:''};
+  render();
+}
+function fecharImport(){imp=null;render();}
+function lerCSV(ev){
+  const f=ev.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=e=>{
+    const p=parseCSV(e.target.result);
+    if(!p||!p.rows.length){alert('Não consegui ler esse arquivo. Confira se é o CSV exportado do relatório.');return;}
+    imp={etapa:'mapear',head:p.head,rows:p.rows,map:autoMap(p.head),nome:f.name};
+    render();
+  };
+  r.readAsText(f,'utf-8');
+}
+function setMap(k,v){imp.map[k]=v===''?undefined:Number(v);render();}
+function confirmarImport(){
+  const j=J();
+  const existentes=new Set(j.trades.map(chaveTrade));
+  let novos=0,dup=0,ruins=0;
+  imp.rows.forEach(r=>{
+    const t=linhaParaTrade(r,imp.map);
+    if(!t.resultado||!t.data){ruins++;return;}
+    if(existentes.has(chaveTrade(t))){dup++;return;}
+    existentes.add(chaveTrade(t));
+    j.trades.push(t);novos++;
+  });
+  j.trades.sort((a,b)=>{
+    const da=parseDate(b.data)-parseDate(a.data);
+    if(da)return da;
+    return String(b.hora_entrada||'').localeCompare(String(a.hora_entrada||''));
+  });
+  save();
+  imp=null;render();
+  alert(`${novos} trade(s) importado(s).${dup?`\n${dup} já existiam e foram ignorados.`:''}${ruins?`\n${ruins} linha(s) sem resultado foram puladas.`:''}`);
+}
+
+function renderImport(){
+  if(!imp)return '';
+  let body='';
+  if(imp.etapa==='arquivo'){
+    body=`<div style="text-align:center;padding:20px 0">
+      <div style="font-size:40px;margin-bottom:10px">📥</div>
+      <div style="font-weight:700;font-size:16px;margin-bottom:6px">Importar CSV do relatório</div>
+      <div style="color:#64748b;font-size:13px;line-height:1.7;max-width:460px;margin:0 auto 18px">
+        No Profit Chart: <b>Relatórios → Performance</b>, escolha o período, clique em <b>Exportar</b> e salve como CSV.
+        Envie o arquivo sem alterar as colunas.
+      </div>
+      <label class="btn-primary" style="cursor:pointer;display:inline-flex">
+        Escolher arquivo CSV<input type="file" accept=".csv,.txt" onchange="lerCSV(event)" style="display:none;width:auto">
+      </label>
+      <div style="color:#334155;font-size:11px;margin-top:14px">Trades repetidos são detectados e não entram duas vezes.</div>
+    </div>`;
+  } else {
+    const amostra=imp.rows.slice(0,5).map(r=>linhaParaTrade(r,imp.map));
+    const okCount=imp.rows.map(r=>linhaParaTrade(r,imp.map)).filter(t=>t.resultado&&t.data).length;
+    body=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-weight:700;font-size:15px">Conferir colunas</div>
+      <span style="color:#475569;font-size:12px">${escHtml(imp.nome)} · ${imp.rows.length} linhas</span>
+    </div>
+    <div style="color:#64748b;font-size:12px;margin-bottom:14px">Detectei as colunas automaticamente. Ajuste o que estiver errado e confira a prévia embaixo.</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:16px">
+      ${CAMPOS.map(f=>`<div>
+        <label class="label">${f.nome}</label>
+        <select onchange="setMap('${f.k}',this.value)">
+          <option value="">— ignorar —</option>
+          ${imp.head.map((h,i)=>`<option value="${i}"${imp.map[f.k]===i?' selected':''}>${escHtml(h||'coluna '+(i+1))}</option>`).join('')}
+        </select>
+      </div>`).join('')}
+    </div>
+    <div style="color:#22c55e;font-size:10px;font-weight:700;letter-spacing:0.6px;margin-bottom:8px">PRÉVIA (5 primeiras linhas)</div>
+    <div style="overflow-x:auto;border:1px solid #1e3a5f;border-radius:8px;margin-bottom:14px">
+      <table class="prev">
+        <tr>${['Data','Entrada','Saída','Período','Ativo','Dir.','Qtd','Resultado','R$','Pts'].map(h=>`<th>${h}</th>`).join('')}</tr>
+        ${amostra.map(t=>`<tr>
+          <td>${escHtml(t.data||'—')}</td><td>${escHtml(t.hora_entrada||'—')}</td><td>${escHtml(t.hora_saida||'—')}</td>
+          <td style="color:${janelaCor(t.janela)}">${escHtml(t.janela||'—')}</td>
+          <td>${escHtml(t.par||'—')}</td><td>${escHtml(t.direcao||'—')}</td><td>${t.qtd??'—'}</td>
+          <td style="color:${rcColor(t.resultado)};font-weight:700">${escHtml(t.resultado||'—')}</td>
+          <td style="color:${t.pnl>=0?'#22c55e':'#ef4444'};font-weight:700">${fmt(t.pnl)}</td>
+          <td>${t.pontos_resultado??'—'}</td>
+        </tr>`).join('')}
+      </table>
+    </div>
+    <div style="background:#060d1f;border:1px solid #1e3a5f;border-radius:8px;padding:11px;margin-bottom:14px;color:#94a3b8;font-size:12px">
+      ${okCount} de ${imp.rows.length} linhas prontas para importar. Depois é só abrir cada trade e preencher região, gatilho, filtros e emoção — eles ficam marcados como <b style="color:#f59e0b">a revisar</b>.
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px">
+      <button class="btn-ghost" onclick="fecharImport()">Cancelar</button>
+      <button class="btn-primary" onclick="confirmarImport()" ${okCount?'':'disabled'}>Importar ${okCount} trade${okCount!==1?'s':''}</button>
+    </div>`;
+  }
+  return `<div class="modal-bg" onclick="if(event.target===this)fecharImport()"><div class="modal">
+    <div style="display:flex;justify-content:flex-end"><button onclick="fecharImport()" style="background:none;border:none;color:#475569;cursor:pointer;font-size:20px">×</button></div>
+    ${body}
+  </div></div>`;
+}
 
 // ══════════════════════════════════════════════════════════════════
 // CALENDAR
@@ -1073,10 +1353,12 @@ function renderCalendar(){
 // ══════════════════════════════════════════════════════════════════
 function switchJournal(k){
   activeJournal=k;ui.showForm=false;ui.openTrades={};ui._editIdx=null;
-  ui.filter={setup:'',resultado:'',par:'',periodo:'',diaSemana:'',janela:'',regioes:[],gatilhos:[],confluencias:[],filtros:[],filtrosOk:''};
+  ui.filter={setup:'',resultado:'',par:'',periodo:'',diaSemana:'',janela:'',revisar:'',regioes:[],gatilhos:[],confluencias:[],filtros:[],filtrosOk:''};
   ui.formData=emptyForm();save();render();
 }
-function setTab(t){ui.tab=t;if(t!=='journal')ui._dayFilter=null;render();}
+function toggleSb(){ui.sbOpen=!ui.sbOpen;render();}
+function toggleJournal(){const ks=Object.keys(JOURNALS);switchJournal(ks[(ks.indexOf(activeJournal)+1)%ks.length]);}
+function setTab(t){ui.tab=t;ui.sbOpen=false;if(t!=='journal')ui._dayFilter=null;render();}
 function showForm(){ui.showForm=true;ui.formMode='manual';ui.formTxt='';ui.formImg=null;ui.formErr='';ui.formData=emptyForm();ui._editIdx=null;render();}
 function hideForm(){ui.showForm=false;ui.formImg=null;ui._editIdx=null;render();}
 function setFormMode(m){ui.formMode=m;render();}
@@ -1127,7 +1409,7 @@ function toggleFilterConfl(i){const v=J().confluences[i];if(v!==undefined)toggle
 function toggleFilterRegiao(i){const v=J().regions[i];if(v!==undefined)toggleFilterList('regioes',v);}
 function toggleFilterGatilho(i){const v=J().triggers[i];if(v!==undefined)toggleFilterList('gatilhos',v);}
 function toggleFilterFiltro(i){const v=J().filters[i];if(v!==undefined)toggleFilterList('filtros',v);}
-function clearFilter(){ui._dayFilter=null;ui.filter={setup:'',resultado:'',par:'',periodo:'',diaSemana:'',janela:'',regioes:[],gatilhos:[],confluencias:[],filtros:[],filtrosOk:''};render();}
+function clearFilter(){ui._dayFilter=null;ui.filter={setup:'',resultado:'',par:'',periodo:'',diaSemana:'',janela:'',revisar:'',regioes:[],gatilhos:[],confluencias:[],filtros:[],filtrosOk:''};render();}
 function toggleTrade(i){ui.openTrades[i]=!ui.openTrades[i];render();}
 function deleteTrade(i){if(confirm('Remover esse trade?')){J().trades.splice(i,1);save();render();}}
 function updateCapital(v){const n=parseFloat(v);if(n>0){J().capital=n;save();render();}}
@@ -1158,7 +1440,7 @@ function saveTrade(){
   const f=ui.formData,c=CFG();
   const missing=isLiq()?(!f.par||!(f.regioes||[]).length||!(f.gatilhos||[]).length||!f.resultado):(!f.par||!f.setup||!f.resultado);
   if(missing){ui.formErr=isLiq()?'Preencha: ativo, ao menos uma região, ao menos um gatilho e resultado.':'Preencha: par, setup e resultado.';render();return;}
-  const trade={...f,janela:classifyJanela(f.hora_entrada)||f.janela||'',pnl:normPnl(f.resultado,f.pnl),rr_realizado:Number(f.rr_realizado)||null,parcial_pct:f.parcial_pct?Number(f.parcial_pct):null,pontos_stop:f.pontos_stop?Number(f.pontos_stop):null,pontos_gain:f.pontos_gain?Number(f.pontos_gain):null};
+  const trade={...f,revisado:true,janela:classifyJanela(f.hora_entrada)||f.janela||'',pnl:normPnl(f.resultado,f.pnl),rr_realizado:Number(f.rr_realizado)||null,parcial_pct:f.parcial_pct?Number(f.parcial_pct):null,pontos_stop:f.pontos_stop?Number(f.pontos_stop):null,pontos_gain:f.pontos_gain?Number(f.pontos_gain):null};
   if(ui._editIdx!=null){J().trades[ui._editIdx]=trade;ui._editIdx=null;}
   else{J().trades.unshift(trade);}
   ui.showForm=false;ui.formImg=null;ui.formData=emptyForm();save();render();
