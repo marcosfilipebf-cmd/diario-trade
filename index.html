@@ -157,7 +157,7 @@ function initJournal(key){
 
 const _now=new Date();
 let imp=null;
-let ui={tab:'journal',sbOpen:false,eqEscala:'trade',eqPeriodo:'',calView:'mes',calMonth:_now.getMonth(),calYear:_now.getFullYear(),showForm:false,
+let ui={tab:'journal',sbOpen:false,eqEscala:'trade',eqPeriodo:'',eqIni:'',eqFim:'',calView:'mes',calMonth:_now.getMonth(),calYear:_now.getFullYear(),showForm:false,
   filter:{setup:'',resultado:'',par:'',periodo:'',diaSemana:'',janela:'',revisar:'',dataPreset:'',dataIni:'',dataFim:'',mesRef:'',regioes:[],gatilhos:[],confluencias:[],filtros:[],filtrosOk:''},
   formMode:'manual',formTxt:'',formImg:null,formData:null,formLoading:false,formErr:'',openTrades:{},_editIdx:null};
 
@@ -1183,12 +1183,46 @@ function renderEquity(){
     if(!ui.eqPeriodo)return true;
     const d=parseDate(t.data);if(!d)return false;
     const hoje=new Date();hoje.setHours(0,0,0,0);
-    if(ui.eqPeriodo==='mes')return d.getMonth()===hoje.getMonth()&&d.getFullYear()===hoje.getFullYear();
-    if(ui.eqPeriodo==='ano')return d.getFullYear()===hoje.getFullYear();
-    const c=new Date(hoje);c.setDate(c.getDate()-parseInt(ui.eqPeriodo));
+    const P=ui.eqPeriodo;
+    if(P==='hoje')  return dkey(d)===dkey(hoje);
+    if(P==='ontem'){const o=new Date(hoje);o.setDate(o.getDate()-1);return dkey(d)===dkey(o);}
+    if(P==='semana')return d>=inicioSemana(hoje);
+    if(P==='semana_ant'){const i=inicioSemana(hoje);const a=new Date(i);a.setDate(a.getDate()-7);return d>=a&&d<i;}
+    if(P==='mes')   return d.getMonth()===hoje.getMonth()&&d.getFullYear()===hoje.getFullYear();
+    if(P==='mes_ant'){const m=new Date(hoje.getFullYear(),hoje.getMonth()-1,1);return d.getMonth()===m.getMonth()&&d.getFullYear()===m.getFullYear();}
+    if(P==='ano')   return d.getFullYear()===hoje.getFullYear();
+    if(P==='custom'){
+      if(ui.eqIni&&d<new Date(ui.eqIni+'T00:00:00'))return false;
+      if(ui.eqFim&&d>new Date(ui.eqFim+'T00:00:00'))return false;
+      return true;
+    }
+    const c=new Date(hoje);c.setDate(c.getDate()-parseInt(P));
     return d>=c;
   });
-  if(T.length<2)return `<div style="text-align:center;padding:48px;color:#374151"><div style="font-size:36px;margin-bottom:10px">📈</div>Registre pelo menos 2 operações para desenhar a curva</div>`;
+  const barraPeriodo=()=>`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+    <div class="journal-switch">
+      ${[['trade','Por operação'],['dia','Por dia']].map(([v,l])=>`<button class="journal-btn${ui.eqEscala===v?' active':''}" onclick="setEq('eqEscala','${v}')">${l}</button>`).join('')}
+    </div>
+    <select onchange="setEqPeriodo(this.value)" style="width:auto">
+      <option value="">Todo o período</option>
+      <optgroup label="Atalhos">
+        ${[['hoje','Hoje'],['ontem','Ontem'],['semana','Esta semana'],['semana_ant','Semana passada'],['mes','Este mês'],['mes_ant','Mês passado'],['ano','Este ano']].map(([v,l])=>`<option value="${v}"${ui.eqPeriodo===v?' selected':''}>${l}</option>`).join('')}
+      </optgroup>
+      <optgroup label="Últimos">
+        ${[['7','7 dias'],['30','30 dias'],['90','90 dias'],['180','180 dias']].map(([v,l])=>`<option value="${v}"${ui.eqPeriodo===v?' selected':''}>${l}</option>`).join('')}
+      </optgroup>
+      <optgroup label="Escolher">
+        <option value="custom"${ui.eqPeriodo==='custom'?' selected':''}>Entre duas datas…</option>
+      </optgroup>
+    </select>
+    ${ui.eqPeriodo==='custom'?`<span style="color:#4b5563;font-size:12px">de</span><input type="date" value="${ui.eqIni||''}" onchange="setEq('eqIni',this.value)" style="width:auto"><span style="color:#4b5563;font-size:12px">até</span><input type="date" value="${ui.eqFim||''}" onchange="setEq('eqFim',this.value)" style="width:auto">`:''}
+    <span style="color:#4b5563;font-size:11.5px">${T.length} operaç${T.length===1?'ão':'ões'}</span>
+  </div>`;
+
+  if(T.length<2){window._eq=null;return barraPeriodo()+`<div style="text-align:center;padding:44px;color:#374151;background:#0e1216;border:1px dashed #1a1f26;border-radius:12px">
+    <div style="font-size:34px;margin-bottom:10px">📈</div>
+    <div style="color:#4b5563;font-size:13.5px">${T.length?'Só uma operação neste recorte':'Nenhuma operação neste recorte'} — a curva precisa de pelo menos duas.</div>
+  </div>`;}
 
   const porDia=ui.eqEscala==='dia';
   const pts=serieEquity(T,porDia);
@@ -1241,15 +1275,7 @@ function renderEquity(){
   // guarda os pontos para o crosshair
   window._eq={pts:pts.map(p=>({...p,px:X(p.ts),py:Y(p.acc)})),W,H,porDia,cur:cur()};
 
-  let html=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
-    <div class="journal-switch">
-      ${[['trade','Por operação'],['dia','Por dia']].map(([v,l])=>`<button class="journal-btn${ui.eqEscala===v?' active':''}" onclick="setEq('eqEscala','${v}')">${l}</button>`).join('')}
-    </div>
-    <select onchange="setEq('eqPeriodo',this.value)" style="width:auto">
-      ${[['','Todo o período'],['30','Últimos 30 dias'],['90','Últimos 90 dias'],['mes','Este mês'],['ano','Este ano']].map(([v,l])=>`<option value="${v}"${ui.eqPeriodo===v?' selected':''}>${l}</option>`).join('')}
-    </select>
-    <span style="color:#4b5563;font-size:11.5px">${T.length} operações · ${nDias} dia${nDias!==1?'s':''}</span>
-  </div>`;
+  let html=barraPeriodo();
 
   html+=`<div class="card">
     <div class="section-label" style="color:#22c55e">📈 RESULTADO ACUMULADO</div>
@@ -1257,9 +1283,9 @@ function renderEquity(){
       <span style="font-size:27px;font-weight:700;color:${fim>=0?'#22c55e':'#ef4444'}">${fim>=0?'+':''}${fmt(fim)}</span>
       <span style="color:#4b5563;font-size:12px">pico de ${fmt(picoMax)}</span>
     </div>
-    <div id="eq-wrap" style="position:relative;overflow-x:auto">
+    <div id="eq-wrap" style="position:relative;overflow-x:auto" onscroll="eqReset()">
       <svg id="eq-svg" viewBox="0 0 ${W} ${H}" style="width:100%;min-width:560px;height:${H}px;display:block;cursor:crosshair"
-           onmousemove="eqHover(event)" onmouseleave="eqOut()" ontouchmove="eqHover(event)" ontouchend="eqOut()">
+           onmouseenter="eqReset()" onmousemove="eqHover(event)" onmouseleave="eqOut()" ontouchstart="eqReset()" ontouchmove="eqHover(event)" ontouchend="eqOut()">
         <defs>
           <linearGradient id="gEq" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stop-color="#22c55e" stop-opacity="0.30"/>
@@ -1279,11 +1305,11 @@ function renderEquity(){
         <path d="${linha}" fill="none" stroke="${fim>=0?'#22c55e':'#ef4444'}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
         ${pts.length<=80?pts.map(p=>`<circle cx="${X(p.ts).toFixed(1)}" cy="${Y(p.acc).toFixed(1)}" r="2.4" fill="${p.acc>=0?'#22c55e':'#ef4444'}"/>`).join(''):''}
         <g id="eq-cross" style="display:none">
-          <line id="eq-vline" y1="${PT}" y2="${PT+ih}" stroke="#4b5563" stroke-width="1" stroke-dasharray="4 4"/>
-          <circle id="eq-dot" r="5" fill="#0e1216" stroke="#22c55e" stroke-width="2.5"/>
+          <line id="eq-vline" y1="${PT}" y2="${PT+ih}" stroke="#4b5563" stroke-width="1" stroke-dasharray="4 4" style="transition:x1 .07s linear,x2 .07s linear"/>
+          <circle id="eq-dot" r="5.5" fill="#0e1216" stroke="#22c55e" stroke-width="2.5" style="transition:cx .07s linear,cy .07s linear"/>
         </g>
       </svg>
-      <div id="eq-tip" style="display:none;position:absolute;pointer-events:none;background:#12161b;border:1px solid #2a323b;border-radius:9px;padding:9px 12px;font-size:12px;box-shadow:0 6px 24px #000a;white-space:nowrap;z-index:5"></div>
+      <div id="eq-tip" style="opacity:0;position:absolute;pointer-events:none;background:#12161b;border:1px solid #2a323b;border-radius:9px;padding:9px 12px;font-size:12px;box-shadow:0 8px 28px #000c;white-space:nowrap;z-index:5;transition:opacity .1s,left .07s linear,top .07s linear;left:0;top:0"></div>
     </div>
     <div style="color:#4b5563;font-size:11px;margin-top:8px">Eixo horizontal: tempo · Eixo vertical: resultado acumulado. Passe o mouse para ver cada ponto.</div>
   </div>`;
@@ -1315,45 +1341,65 @@ function renderEquity(){
 
   return html;
 }
+let _eqRaf=null,_eqRect=null,_eqLast=null;
+function eqRect(svg){
+  if(!_eqRect)_eqRect=svg.getBoundingClientRect();
+  return _eqRect;
+}
 function eqHover(ev){
   const E=window._eq;if(!E)return;
   const svg=document.getElementById('eq-svg');if(!svg)return;
-  const r=svg.getBoundingClientRect();
-  const cx=(ev.touches?ev.touches[0].clientX:ev.clientX)-r.left;
-  const vx=cx*(E.W/r.width);
-  let melhor=E.pts[0],dist=Infinity;
-  E.pts.forEach(p=>{const d=Math.abs(p.px-vx);if(d<dist){dist=d;melhor=p;}});
-  const g=document.getElementById('eq-cross');
-  const ln=document.getElementById('eq-vline');
-  const dot=document.getElementById('eq-dot');
-  const tip=document.getElementById('eq-tip');
-  if(!g||!tip)return;
-  g.style.display='';
-  ln.setAttribute('x1',melhor.px);ln.setAttribute('x2',melhor.px);
-  dot.setAttribute('cx',melhor.px);dot.setAttribute('cy',melhor.py);
-  dot.setAttribute('stroke',melhor.acc>=0?'#22c55e':'#ef4444');
-  const cor=melhor.acc>=0?'#22c55e':'#ef4444';
-  const dcor=melhor.delta>=0?'#22c55e':'#ef4444';
-  tip.innerHTML=`
-    <div style="color:#9aa3ad;font-size:11px;margin-bottom:4px">${melhor.data}${melhor.hora?' · '+melhor.hora:''}${E.porDia?` · ${melhor.n} oper.`:melhor.par?' · '+melhor.par:''}</div>
-    <div style="color:${cor};font-weight:700;font-size:15px">${fmt(melhor.acc)}</div>
-    <div style="color:${dcor};font-size:11.5px;margin-top:2px">${melhor.delta>=0?'+':''}${fmt(melhor.delta)} ${E.porDia?`no dia${melhor.w!==undefined?` · ${melhor.w}W ${melhor.l}L`:''}`:'nesta operação'}</div>
-    ${melhor.dd<0?`<div style="color:#f59e0b;font-size:11px;margin-top:3px">${fmt(melhor.dd)} abaixo do topo</div>`:''}`;
-  const px=melhor.px*(r.width/E.W);
-  const py=melhor.py*(r.height/E.H);
-  tip.style.display='block';
-  const tw=tip.offsetWidth||160;
-  let left=px+14;
-  if(left+tw>r.width)left=px-tw-14;
-  tip.style.left=Math.max(4,left)+'px';
-  tip.style.top=Math.max(4,py-46)+'px';
+  const cx=(ev.touches?ev.touches[0].clientX:ev.clientX);
+  if(_eqRaf)return;                       // 1 atualização por quadro
+  _eqRaf=requestAnimationFrame(()=>{
+    _eqRaf=null;
+    const r=eqRect(svg);
+    const vx=(cx-r.left)*(E.W/r.width);
+    let melhor=E.pts[0],dist=Infinity;
+    for(const p of E.pts){const d=Math.abs(p.px-vx);if(d<dist){dist=d;melhor=p;}}
+    const g=document.getElementById('eq-cross');
+    const tip=document.getElementById('eq-tip');
+    if(!g||!tip)return;
+    g.style.display='';
+    const ln=document.getElementById('eq-vline'), dot=document.getElementById('eq-dot');
+    ln.setAttribute('x1',melhor.px);ln.setAttribute('x2',melhor.px);
+    dot.setAttribute('cx',melhor.px);dot.setAttribute('cy',melhor.py);
+    dot.setAttribute('stroke',melhor.acc>=0?'#22c55e':'#ef4444');
+    if(_eqLast!==melhor.ts+'|'+melhor.acc){
+      _eqLast=melhor.ts+'|'+melhor.acc;
+      const cor=melhor.acc>=0?'#22c55e':'#ef4444';
+      const dcor=melhor.delta>=0?'#22c55e':'#ef4444';
+      tip.innerHTML=`
+        <div style="color:#9aa3ad;font-size:11px;margin-bottom:4px">${melhor.data}${melhor.hora?' · '+melhor.hora:''}${E.porDia?` · ${melhor.n} oper.`:melhor.par?' · '+melhor.par:''}</div>
+        <div style="color:${cor};font-weight:700;font-size:15px">${fmt(melhor.acc)}</div>
+        <div style="color:${dcor};font-size:11.5px;margin-top:2px">${melhor.delta>=0?'+':''}${fmt(melhor.delta)} ${E.porDia?`no dia${melhor.w!==undefined?` · ${melhor.w}W ${melhor.l}L`:''}`:'nesta operação'}</div>
+        ${melhor.dd<0?`<div style="color:#f59e0b;font-size:11px;margin-top:3px">${fmt(melhor.dd)} abaixo do topo</div>`:''}`;
+    }
+    const esc=r.width/E.W;
+    const px=melhor.px*esc, py=melhor.py*(r.height/E.H);
+    tip.style.opacity='1';
+    const tw=tip.offsetWidth||170;
+    let left=px+16;
+    if(left+tw>r.width)left=px-tw-16;
+    tip.style.left=Math.max(4,left)+'px';
+    tip.style.top=Math.max(4,py-48)+'px';
+  });
 }
 function eqOut(){
+  if(_eqRaf){cancelAnimationFrame(_eqRaf);_eqRaf=null;}
+  _eqLast=null;
   const g=document.getElementById('eq-cross');const tip=document.getElementById('eq-tip');
   if(g)g.style.display='none';
-  if(tip)tip.style.display='none';
+  if(tip)tip.style.opacity='0';
 }
-function setEq(k,v){ui[k]=v;render();}
+function eqReset(){_eqRect=null;}
+function setEq(k,v){ui[k]=v;eqReset();render();}
+function setEqPeriodo(v){
+  ui.eqPeriodo=v;
+  if(v!=='custom'){ui.eqIni='';ui.eqFim='';}
+  eqReset();render();
+}
+try{window.addEventListener('resize',eqReset);}catch{}
 function checkarBackupInit(){try{checarBackup();}catch{}}
 
 // ══════════════════════════════════════════════════════════════════
