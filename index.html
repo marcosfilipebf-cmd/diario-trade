@@ -1158,15 +1158,20 @@ function serieEquity(trades,porDia){
     const dias={};
     ord.forEach(t=>{const k=dkey(parseDate(t.data));(dias[k]=dias[k]||[]).push(t);});
     Object.keys(dias).sort().forEach(k=>{
-      acc+=dias[k].reduce((a,t)=>a+(t.pnl||0),0);
-      pico=Math.max(pico,acc);
-      pts.push({rot:k.split('-').reverse().slice(0,2).join('/'),acc,dd:acc-pico,n:dias[k].length});
+      const lista=dias[k];
+      const pnlDia=lista.reduce((a,t)=>a+(t.pnl||0),0);
+      acc+=pnlDia;pico=Math.max(pico,acc);
+      const d=parseDate(lista[0].data);
+      pts.push({ts:d.getTime(),data:lista[0].data,hora:'',rot:k.split('-').reverse().slice(0,2).join('/'),acc,dd:acc-pico,n:lista.length,delta:pnlDia,
+        w:lista.filter(t=>t.resultado==='Win').length,l:lista.filter(t=>t.resultado==='Loss').length});
     });
   } else {
     ord.forEach((t,i)=>{
-      acc+=(t.pnl||0);
-      pico=Math.max(pico,acc);
-      pts.push({rot:`#${i+1}`,acc,dd:acc-pico,data:t.data,n:1});
+      acc+=(t.pnl||0);pico=Math.max(pico,acc);
+      const d=parseDate(t.data);
+      const mm=hm2min(t.hora_entrada);
+      pts.push({ts:d.getTime()+(mm!==null?mm*60000:0),data:t.data,hora:t.hora_entrada||'',rot:`#${i+1}`,
+        acc,dd:acc-pico,n:1,delta:(t.pnl||0),par:t.par,resultado:t.resultado,idx:i+1});
     });
   }
   return pts;
@@ -1190,24 +1195,28 @@ function renderEquity(){
   const vals=pts.map(p=>p.acc);
   const maxV=Math.max(...vals,0), minV=Math.min(...vals,0);
   const span=(maxV-minV)||1;
-  const W=1000,H=280,PL=8,PR=8,PT=14,PB=22;
+  // eixo X proporcional ao TEMPO
+  const tMin=pts[0].ts, tMax=pts[pts.length-1].ts;
+  const tSpan=(tMax-tMin)||1;
+  const W=1000,H=300,PL=62,PR=14,PT=16,PB=30;
   const iw=W-PL-PR, ih=H-PT-PB;
-  const X=i=>PL+(pts.length===1?iw/2:i*iw/(pts.length-1));
+  const X=ts=>PL+((ts-tMin)/tSpan)*iw;
   const Y=v=>PT+ih-((v-minV)/span)*ih;
   const y0=Y(0);
 
-  const linha=pts.map((p,i)=>`${i?'L':'M'}${X(i).toFixed(1)},${Y(p.acc).toFixed(1)}`).join(' ');
-  const area=`${linha} L${X(pts.length-1).toFixed(1)},${y0.toFixed(1)} L${X(0).toFixed(1)},${y0.toFixed(1)} Z`;
+  const linha=pts.map((p,i)=>`${i?'L':'M'}${X(p.ts).toFixed(1)},${Y(p.acc).toFixed(1)}`).join(' ');
+  const area=`${linha} L${X(tMax).toFixed(1)},${y0.toFixed(1)} L${X(tMin).toFixed(1)},${y0.toFixed(1)} Z`;
 
   // drawdown
   const ddMin=Math.min(...pts.map(p=>p.dd));
   const ddSpan=Math.abs(ddMin)||1;
-  const DH=70;
-  const ddPath=pts.map((p,i)=>`${i?'L':'M'}${X(i).toFixed(1)},${(6+(Math.abs(p.dd)/ddSpan)*(DH-12)).toFixed(1)}`).join(' ');
+  const DH=84, DPT=10, DPB=8, dih=DH-DPT-DPB;
+  const DY=v=>DPT+(Math.abs(v)/ddSpan)*dih;
+  const ddPath=pts.map((p,i)=>`${i?'L':'M'}${X(p.ts).toFixed(1)},${DY(p.dd).toFixed(1)}`).join(' ');
 
   // métricas
   const fim=pts[pts.length-1].acc;
-  const picoMax=Math.max(...pts.map((p,i)=>Math.max(...pts.slice(0,i+1).map(x=>x.acc))));
+  const picoMax=Math.max(...pts.map(p=>p.acc),0);
   const ddPctPico=picoMax>0?Math.abs(ddMin)/picoMax*100:0;
   let seqW=0,seqL=0,bw=0,bl=0;
   [...T].sort((a,b)=>parseDate(a.data)-parseDate(b.data)).forEach(t=>{
@@ -1217,8 +1226,20 @@ function renderEquity(){
   const nDias=new Set(T.map(t=>t.data)).size;
   const diasVerdes=(()=>{const d={};T.forEach(t=>{d[t.data]=(d[t.data]||0)+(t.pnl||0);});return Object.values(d).filter(v=>v>0).length;})();
 
-  // rótulos do eixo
-  const marcas=[maxV,minV+span/2,minV].filter((v,i,a)=>a.indexOf(v)===i);
+  // ── eixos
+  const nY=5;
+  const marcasY=[];
+  for(let i=0;i<=nY;i++){const v=minV+span*i/nY;marcasY.push(v);}
+  const nX=Math.min(6,pts.length);
+  const marcasX=[];
+  for(let i=0;i<nX;i++){
+    const ts=tMin+tSpan*(nX===1?0:i/(nX-1));
+    const d=new Date(ts);
+    marcasX.push({ts,rot:`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`});
+  }
+
+  // guarda os pontos para o crosshair
+  window._eq={pts:pts.map(p=>({...p,px:X(p.ts),py:Y(p.acc)})),W,H,porDia,cur:cur()};
 
   let html=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
     <div class="journal-switch">
@@ -1232,38 +1253,49 @@ function renderEquity(){
 
   html+=`<div class="card">
     <div class="section-label" style="color:#22c55e">📈 RESULTADO ACUMULADO</div>
-    <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px">
+    <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px">
       <span style="font-size:27px;font-weight:700;color:${fim>=0?'#22c55e':'#ef4444'}">${fim>=0?'+':''}${fmt(fim)}</span>
       <span style="color:#4b5563;font-size:12px">pico de ${fmt(picoMax)}</span>
     </div>
-    <div style="overflow-x:auto">
-      <svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:520px;height:${H}px;display:block">
+    <div id="eq-wrap" style="position:relative;overflow-x:auto">
+      <svg id="eq-svg" viewBox="0 0 ${W} ${H}" style="width:100%;min-width:560px;height:${H}px;display:block;cursor:crosshair"
+           onmousemove="eqHover(event)" onmouseleave="eqOut()" ontouchmove="eqHover(event)" ontouchend="eqOut()">
         <defs>
           <linearGradient id="gEq" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#22c55e" stop-opacity="0.32"/>
+            <stop offset="0%" stop-color="#22c55e" stop-opacity="0.30"/>
             <stop offset="100%" stop-color="#22c55e" stop-opacity="0"/>
           </linearGradient>
         </defs>
-        ${marcas.map(v=>`<g>
+        ${marcasY.map(v=>`<g>
           <line x1="${PL}" y1="${Y(v).toFixed(1)}" x2="${W-PR}" y2="${Y(v).toFixed(1)}" stroke="#161b21" stroke-width="1"/>
-          <text x="${PL+3}" y="${(Y(v)-4).toFixed(1)}" fill="#374151" font-size="10">${fmt(v)}</text>
+          <text x="${PL-8}" y="${(Y(v)+3.5).toFixed(1)}" fill="#4b5563" font-size="11" text-anchor="end">${fmt(v)}</text>
         </g>`).join('')}
-        <line x1="${PL}" y1="${y0.toFixed(1)}" x2="${W-PR}" y2="${y0.toFixed(1)}" stroke="#2a323b" stroke-width="1" stroke-dasharray="3 3"/>
+        ${marcasX.map(m=>`<g>
+          <line x1="${X(m.ts).toFixed(1)}" y1="${PT}" x2="${X(m.ts).toFixed(1)}" y2="${PT+ih}" stroke="#12161b" stroke-width="1"/>
+          <text x="${X(m.ts).toFixed(1)}" y="${H-10}" fill="#4b5563" font-size="11" text-anchor="middle">${m.rot}</text>
+        </g>`).join('')}
+        <line x1="${PL}" y1="${y0.toFixed(1)}" x2="${W-PR}" y2="${y0.toFixed(1)}" stroke="#2a323b" stroke-width="1" stroke-dasharray="4 4"/>
         <path d="${area}" fill="url(#gEq)"/>
         <path d="${linha}" fill="none" stroke="${fim>=0?'#22c55e':'#ef4444'}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-        ${pts.length<=60?pts.map((p,i)=>`<circle cx="${X(i).toFixed(1)}" cy="${Y(p.acc).toFixed(1)}" r="2.5" fill="${p.acc>=0?'#22c55e':'#ef4444'}"><title>${p.rot}: ${fmt(p.acc)}</title></circle>`).join(''):''}
-        <text x="${PL}" y="${H-6}" fill="#374151" font-size="10">${pts[0].rot}</text>
-        <text x="${W-PR}" y="${H-6}" fill="#374151" font-size="10" text-anchor="end">${pts[pts.length-1].rot}</text>
+        ${pts.length<=80?pts.map(p=>`<circle cx="${X(p.ts).toFixed(1)}" cy="${Y(p.acc).toFixed(1)}" r="2.4" fill="${p.acc>=0?'#22c55e':'#ef4444'}"/>`).join(''):''}
+        <g id="eq-cross" style="display:none">
+          <line id="eq-vline" y1="${PT}" y2="${PT+ih}" stroke="#4b5563" stroke-width="1" stroke-dasharray="4 4"/>
+          <circle id="eq-dot" r="5" fill="#0e1216" stroke="#22c55e" stroke-width="2.5"/>
+        </g>
       </svg>
+      <div id="eq-tip" style="display:none;position:absolute;pointer-events:none;background:#12161b;border:1px solid #2a323b;border-radius:9px;padding:9px 12px;font-size:12px;box-shadow:0 6px 24px #000a;white-space:nowrap;z-index:5"></div>
     </div>
+    <div style="color:#4b5563;font-size:11px;margin-top:8px">Eixo horizontal: tempo · Eixo vertical: resultado acumulado. Passe o mouse para ver cada ponto.</div>
   </div>`;
 
   html+=`<div class="card">
     <div class="section-label" style="color:#ef4444">📉 DRAWDOWN — QUANTO CAIU DESDE O TOPO</div>
     <div style="overflow-x:auto">
-      <svg viewBox="0 0 ${W} ${DH}" style="width:100%;min-width:520px;height:${DH}px;display:block">
-        <line x1="${PL}" y1="6" x2="${W-PR}" y2="6" stroke="#2a323b" stroke-width="1" stroke-dasharray="3 3"/>
-        <path d="${ddPath} L${X(pts.length-1).toFixed(1)},6 L${X(0).toFixed(1)},6 Z" fill="#ef444422"/>
+      <svg viewBox="0 0 ${W} ${DH}" style="width:100%;min-width:560px;height:${DH}px;display:block">
+        <line x1="${PL}" y1="${DPT}" x2="${W-PR}" y2="${DPT}" stroke="#2a323b" stroke-width="1" stroke-dasharray="4 4"/>
+        <text x="${PL-8}" y="${DPT+4}" fill="#4b5563" font-size="10" text-anchor="end">0</text>
+        <text x="${PL-8}" y="${DPT+dih+4}" fill="#4b5563" font-size="10" text-anchor="end">${fmt(ddMin)}</text>
+        <path d="${ddPath} L${X(tMax).toFixed(1)},${DPT} L${X(tMin).toFixed(1)},${DPT} Z" fill="#ef444422"/>
         <path d="${ddPath}" fill="none" stroke="#ef4444" stroke-width="1.6"/>
       </svg>
     </div>
@@ -1282,6 +1314,44 @@ function renderEquity(){
   </div>`;
 
   return html;
+}
+function eqHover(ev){
+  const E=window._eq;if(!E)return;
+  const svg=document.getElementById('eq-svg');if(!svg)return;
+  const r=svg.getBoundingClientRect();
+  const cx=(ev.touches?ev.touches[0].clientX:ev.clientX)-r.left;
+  const vx=cx*(E.W/r.width);
+  let melhor=E.pts[0],dist=Infinity;
+  E.pts.forEach(p=>{const d=Math.abs(p.px-vx);if(d<dist){dist=d;melhor=p;}});
+  const g=document.getElementById('eq-cross');
+  const ln=document.getElementById('eq-vline');
+  const dot=document.getElementById('eq-dot');
+  const tip=document.getElementById('eq-tip');
+  if(!g||!tip)return;
+  g.style.display='';
+  ln.setAttribute('x1',melhor.px);ln.setAttribute('x2',melhor.px);
+  dot.setAttribute('cx',melhor.px);dot.setAttribute('cy',melhor.py);
+  dot.setAttribute('stroke',melhor.acc>=0?'#22c55e':'#ef4444');
+  const cor=melhor.acc>=0?'#22c55e':'#ef4444';
+  const dcor=melhor.delta>=0?'#22c55e':'#ef4444';
+  tip.innerHTML=`
+    <div style="color:#9aa3ad;font-size:11px;margin-bottom:4px">${melhor.data}${melhor.hora?' · '+melhor.hora:''}${E.porDia?` · ${melhor.n} oper.`:melhor.par?' · '+melhor.par:''}</div>
+    <div style="color:${cor};font-weight:700;font-size:15px">${fmt(melhor.acc)}</div>
+    <div style="color:${dcor};font-size:11.5px;margin-top:2px">${melhor.delta>=0?'+':''}${fmt(melhor.delta)} ${E.porDia?`no dia${melhor.w!==undefined?` · ${melhor.w}W ${melhor.l}L`:''}`:'nesta operação'}</div>
+    ${melhor.dd<0?`<div style="color:#f59e0b;font-size:11px;margin-top:3px">${fmt(melhor.dd)} abaixo do topo</div>`:''}`;
+  const px=melhor.px*(r.width/E.W);
+  const py=melhor.py*(r.height/E.H);
+  tip.style.display='block';
+  const tw=tip.offsetWidth||160;
+  let left=px+14;
+  if(left+tw>r.width)left=px-tw-14;
+  tip.style.left=Math.max(4,left)+'px';
+  tip.style.top=Math.max(4,py-46)+'px';
+}
+function eqOut(){
+  const g=document.getElementById('eq-cross');const tip=document.getElementById('eq-tip');
+  if(g)g.style.display='none';
+  if(tip)tip.style.display='none';
 }
 function setEq(k,v){ui[k]=v;render();}
 function checkarBackupInit(){try{checarBackup();}catch{}}
